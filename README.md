@@ -1,4 +1,4 @@
-# WebGPU Client Side Volume Rendering for 3D Medical Imaging
+# Ossium
 
 A WebGPU volume rendering application to display 3D medical imaging data in the browser. This application investigates and showcases the viability of the new WebGPU framework in client-side rendering of 3D medical imaging.
 
@@ -18,8 +18,8 @@ Install the latest versions of Git, Yarn and Python.
 
 Clone the repository and download and install Yarn and Python packages:
 ```bash
-git clone https://github.com/fraserlove/webgpu-medical-imaging.git
-cd webgpu-medical-imaging
+git clone https://github.com/fraserlove/ossium.git
+cd ossium
 make
 ```
 Build the frontend application and start the backend Flask server, specifiying the path to the resource directory containing the volumes and transfer functions:
