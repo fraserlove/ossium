@@ -40,9 +40,12 @@ fn intensity(sample: vec4<f32>) -> f32 {
 fn normal(pos: vec3<f32>) -> vec3<f32> {
     var size = vec3<f32>(textureDimensions(volumeTexture));
     var delta = vec3<f32>(0, 0, 0);
-    delta.x = intensity(textureSample(volumeTexture, volumeSampler, pos + vec3<f32>(1 / size.x, 0, 0))) - intensity(textureSample(volumeTexture, volumeSampler, pos - vec3<f32>(1 / size.x, 0, 0)));
-    delta.y = intensity(textureSample(volumeTexture, volumeSampler, pos + vec3<f32>(0, 1 / size.y, 0))) - intensity(textureSample(volumeTexture, volumeSampler, pos - vec3<f32>(0, 1 / size.y, 0)));
-    delta.z = intensity(textureSample(volumeTexture, volumeSampler, pos + vec3<f32>(0, 0, 1 / size.z))) - intensity(textureSample(volumeTexture, volumeSampler, pos - vec3<f32>(0, 0, 1 / size.z)));
+    delta.x = intensity(textureLoad(volumeTexture, vec3<i32>(i32(pos.x * size.x + 1), i32(pos.y * size.y), i32(pos.z * size.z)), 0)) - 
+              intensity(textureLoad(volumeTexture, vec3<i32>(i32(pos.x * size.x - 1), i32(pos.y * size.y), i32(pos.z * size.z)), 0));
+    delta.y = intensity(textureLoad(volumeTexture, vec3<i32>(i32(pos.x * size.x), i32(pos.y * size.y + 1), i32(pos.z * size.z)), 0)) - 
+              intensity(textureLoad(volumeTexture, vec3<i32>(i32(pos.x * size.x), i32(pos.y * size.y - 1), i32(pos.z * size.z)), 0));
+    delta.z = intensity(textureLoad(volumeTexture, vec3<i32>(i32(pos.x * size.x), i32(pos.y * size.y), i32(pos.z * size.z + 1)), 0)) - 
+              intensity(textureLoad(volumeTexture, vec3<i32>(i32(pos.x * size.x), i32(pos.y * size.y), i32(pos.z * size.z - 1)), 0));
     return normalize(delta);
 }
 
@@ -64,7 +67,10 @@ fn frag_main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
         if (coords.z < uniforms.slab[2][0] || coords.z > uniforms.slab[2][1]) { continue; }
         // Scale down transformed coordinates to fit within 0->1 range
         coords = vec3<f32>(coords.x / size.x, coords.y / size.y, coords.z / size.z);
-        var val = intensity(textureSample(volumeTexture, volumeSampler, coords));
+        
+        // Use textureLoad instead of textureSample for uniform control flow
+        var texCoords = vec3<i32>(i32(coords.x * size.x), i32(coords.y * size.y), i32(coords.z * size.z));
+        var val = intensity(textureLoad(volumeTexture, texCoords, 0));
         var transferCoords = vec2<i32>(i32(val) % i32(uniforms.transferWidth), i32(val) / i32(uniforms.transferWidth));
         var colour: vec4<f32> = textureLoad(transferTexture, transferCoords, 0);
 

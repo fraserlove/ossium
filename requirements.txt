@@ -1,6 +1,5 @@
 Flask==2.2.2
-numpy==1.23.2
-pydicom==2.3.0
-python-gdcm==3.0.15
-xmltodict==0.13.0
+numpy~=2.2.0
+pydicom==3.0.0
+xmltodict==0.14.2
 

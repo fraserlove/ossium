@@ -1,7 +1,7 @@
 ifeq ($(OS),Windows_NT)
 	PYTHON := python
 else
-	PYTHON := python3
+	PYTHON := python
 endif
 
 install:
@@ -10,7 +10,7 @@ install:
 	./venv/bin/pip install -r requirements.txt
 
 start:
-	yarn webpack --mode production & ./venv/bin/python3 app.py $(RESOURCES)
+	yarn webpack --mode production & python app.py $(RESOURCES)
 
 clean:
 	rm -rf ./node_modules

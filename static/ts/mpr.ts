@@ -12,11 +12,19 @@ export class RendererMPR extends Renderer {
     }
 
     protected getUniformData(): Float32Array {
-        let uniformData = new Float32Array(this.camera.getViewMatrix().length + 
-                                                    (this.settings as SettingsMPR).getSettings().length + 1);
-        uniformData.set([...this.camera.getViewMatrix(), 
-                                ...(this.settings as SettingsMPR).getSettings(),
-                                this.context.getVolume().bitsPerVoxel]);
+        // Ensure 16-byte alignment
+        const uniformData = new Float32Array(28);
+        
+        // Set view matrix (16 elements)
+        uniformData.set(this.camera.getViewMatrix(), 0);
+        
+        // Set settings (slab matrix and other values)
+        const settings = (this.settings as SettingsMPR).getSettings();
+        uniformData.set(settings, 16);
+        
+        // Set bitsPerVoxel
+        uniformData[24] = this.context.getVolume().bitsPerVoxel;
+        
         return uniformData;
     }
 }

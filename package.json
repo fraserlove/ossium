@@ -1,6 +1,6 @@
 {
-  "name": "webgpu-rendering-medical-imaging",
-  "version": "1.0.0",
+  "name": "ossium",
+  "version": "0.1.0",
   "author": "Fraser Love",
   "license": "MIT",
   "devDependencies": {

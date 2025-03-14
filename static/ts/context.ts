@@ -104,7 +104,18 @@ export class Context {
         console.log('CONTEXT: Initialising WebGPU...');
         try {
             this.adapter = await navigator.gpu.requestAdapter();
-            this.device = await this.adapter.requestDevice();
+            
+            // Check adapter limits and request higher buffer size limit
+            const adapterLimits = this.adapter.limits;
+            const requiredLimits = {
+                maxStorageBufferBindingSize: Math.min(4294967296, adapterLimits.maxStorageBufferBindingSize),
+                maxBufferSize: Math.min(4294967296, adapterLimits.maxStorageBufferBindingSize)
+            };
+            
+            this.device = await this.adapter.requestDevice({
+                requiredLimits: requiredLimits
+            });
+            
             this.queue = this.device.queue;
         }
         catch(error) {
@@ -113,7 +124,8 @@ export class Context {
             return false;
         }
         console.log('CONTEXT: Initialised WebGPU.');
-        this.transferFunction.size = [this.device.limits.maxTextureDimension1D, this.transferFunction.noColours / this.device.limits.maxTextureDimension1D];
+        this.transferFunction.size = [this.device.limits.maxTextureDimension1D, Math.ceil(this.transferFunction.n_colours / this.device.limits.maxTextureDimension1D)];
+        console.log(this.transferFunction.size);
         return true;
     }
 }

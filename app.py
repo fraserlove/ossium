@@ -1,7 +1,7 @@
-import os, sys, xmltodict, json, struct, pydicom, numpy
+import os, sys, json, struct
 from flask import Flask, render_template, Response, stream_with_context
-from src.volume import Volume
-from src.transfer_function import TransferFunction
+
+from ossium import Volume, TransferFunction
 
 class Server():
 
@@ -14,22 +14,23 @@ class Server():
         self.read_resources()
 
     def read_resources(self):
+        """Load all volume and transfer function resources from the specified directory."""
         filenames = sorted([f for f in os.listdir(self.res_path) if not f.startswith('.')])
+        
+        # Process each file/directory in the resources path
         for filename in filenames:
-            if filename.split('.')[-1] == 'xml':
-                file = os.path.join(self.res_path, filename)
-                meta = xmltodict.parse(open(file).read())
-                if 'Volume_View' in meta: self.volumes.append(Volume.from_xml(meta['Volume_View']))
-                elif 'Transfer_Function' in meta: self.transfer_functions.append(TransferFunction(meta['Transfer_Function']))
+            file_path = os.path.join(self.res_path, filename)
+            
+            # Load transfer function files
+            if filename.endswith('.tf'):
+                self.transfer_functions.append(TransferFunction(file_path))
+                
+            # Process DICOM directories
+            if os.path.isdir(file_path):
+                self.volumes.append(Volume(file_path))
 
-            if os.path.isdir(os.path.join(self.res_path, filename)):
-                dcm_files = [f for f in os.listdir(os.path.join(self.res_path, filename)) if f.split('.')[-1] == 'dcm' and not f.startswith('.')]
-                if len(dcm_files) > 0:
-                    dcm_file = os.path.join(self.res_path, filename, dcm_files[0])
-                    self.volumes.append(Volume.from_dicom(pydicom.read_file(dcm_file), len(dcm_files), filename))
-
-        self.setup();
-        self.start();
+        self.setup()
+        self.start()
 
     def setup(self):
         @self.app.route('/')
@@ -38,52 +39,28 @@ class Server():
 
         @self.app.route('/volumes')
         def volumes():
-            return json.dumps([vars(volume) for volume in self.volumes])
+            return json.dumps([volume.__getstate__() for volume in self.volumes])
 
         @self.app.route('/transfer_functions')
         def transfer_functions():
-            return json.dumps([vars(transfer_function) for transfer_function in self.transfer_functions])
+            return json.dumps([tf.__getstate__() for tf in self.transfer_functions])
 
         @self.app.route('/volume/<string:filename>')
         def send_volume(filename = None):
             for volume in self.volumes:
                 if filename == volume.filename:
-                    if os.path.isdir(os.path.join(self.res_path, filename)): return Response(stream_with_context(self.chunk_dicom(os.path.join(self.res_path, filename))))
-                    else: return Response(stream_with_context(self.chunk_file(os.path.join(self.res_path, filename + '.raw'), volume.signed, volume.bitsPerVoxel)))
+                    return Response(stream_with_context(volume.stream_data()))
+            return Response(status=404)
 
         @self.app.route('/transfer_function/<string:filename>')
         def send_transfer_function(filename = None):
-            if filename in [transfer_function.filename for transfer_function in self.transfer_functions]:
-                return Response(stream_with_context(self.chunk_file(os.path.join(self.res_path, filename), False, None)))
+            for tf in self.transfer_functions:
+                if tf.filename == filename:
+                    return Response(stream_with_context(tf.stream_data()))
+            return Response(status=404)
 
     def start(self):
         self.app.run(host='0.0.0.0', port=self.port)
 
-    def chunk_dicom(self, path):
-        print('Chunking DICOM:', path)
-        for file in sorted([f for f in os.listdir(path) if f.split('.')[-1] == 'dcm' and not f.startswith('.')]):
-            meta = pydicom.read_file(os.path.join(path, file))
-            rescaleSlope = 1 if meta.get('RescaleSlope') == None else meta.RescaleSlope
-            rescaleIntercept = 0 if meta.get('RescaleIntercept') == None else meta.RescaleIntercept
-            out = (rescaleSlope * meta.pixel_array + rescaleIntercept) + 2 ** 15 - rescaleIntercept
-            yield out.astype(numpy.uint16).tobytes()
-
-    def chunk_file(self, path, signed, bitsPerVoxel):
-        print('Chunking RAW:', path)
-        CHUNK_SIZE = 2 ** 24
-        with open(path, 'rb') as file:
-            while True:
-                binary = file.read(CHUNK_SIZE)
-                if signed:
-                    if bitsPerVoxel == 16: format_char = 'h'
-                    elif bitsPerVoxel == 8: format_char = 'b'
-                    signed = struct.unpack('{}{}'.format(len(binary) // 2, format_char), binary)
-                    unsigned = [short + 2 ** 15 for short in signed]
-                    binary = struct.pack('{}{}'.format(len(binary) // 2, format_char.upper()), *unsigned)
-                if binary: yield binary
-                else: break
-
 if __name__ == '__main__':
     server = Server()
-
-    

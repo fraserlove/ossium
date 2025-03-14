@@ -29,13 +29,18 @@ fn frag_main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
         var transformed = uniforms.transform * vec4<f32>(coord.xy, f32(k), 1.0);
         // Scale down transformed coordinates to fit within 0->1 range
         var uvz_coords = vec3<f32>(transformed.x / size.x, transformed.y / size.y, transformed.z / size.z);
+        
+        // Sample the texture regardless of bounds
         var sample = textureSample(volumeTexture, volumeSampler, uvz_coords);
-        // Check transformed coordinate is still inside bounds - removes texture clamp artefact
-        if (transformed.x < uniforms.slab[0][0] || transformed.x > uniforms.slab[0][1]) { continue; }
-        if (transformed.y < uniforms.slab[1][0] || transformed.y > uniforms.slab[1][1]) { continue; }
-        if (transformed.z < uniforms.slab[2][0] || transformed.z > uniforms.slab[2][1]) { continue; }
-        if (intensity(sample) > maxIntensity) { maxIntensity = intensity(sample); }
+        
+        // Only use the sample if it's within bounds
+        if (transformed.x >= uniforms.slab[0][0] && transformed.x <= uniforms.slab[0][1] &&
+            transformed.y >= uniforms.slab[1][0] && transformed.y <= uniforms.slab[1][1] &&
+            transformed.z >= uniforms.slab[2][0] && transformed.z <= uniforms.slab[2][1]) {
+            var sampleIntensity = intensity(sample);
+            maxIntensity = max(maxIntensity, sampleIntensity);
+        }
     }
     var out = (maxIntensity - (uniforms.level + uniforms.width / 2)) / uniforms.width;
     return vec4<f32>(out, out, out, 1);
- }
+}
