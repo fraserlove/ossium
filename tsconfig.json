@@ -1,12 +1,9 @@
 {
   "compilerOptions": {
-    "outDir": "static/dist",
+    "outDir": "dist",
     "sourceMap": true,
-    "noImplicitAny": false,
-    "module": "commonjs",
-    "target": "es2020",
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
+    "module": "esnext",
+    "target": "esnext",
     "moduleResolution": "node",
     "typeRoots": ["./node_modules/@webgpu/types"]
   },

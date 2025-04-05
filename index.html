@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <title>Ossium</title>
+        <style>
+            html, body { margin:0; padding:0; height: 100%; overflow:hidden; background-color: black; }
+            #container { float: left; position: relative; }
+            #gui { position: absolute; top: 0; right: 0; background-color: rgba(0, 0, 0, 0); }
+            #gui-global { position: absolute; bottom: 0; right: 0; z-index: 1; background-color: rgba(0, 0, 0, 0); }
+            #gui-global .title, #gui .title, #gui-global .children, #gui .children { background-color: rgba(0, 0, 0, 0.5); }
+        </style>
+    </head>
+    <body>
+        <script src='./dist/bundle.js'></script>
+    </body>
+</html>

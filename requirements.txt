@@ -1,5 +1,0 @@
-Flask==2.2.2
-numpy~=2.2.0
-pydicom==3.0.0
-xmltodict==0.14.2
-
