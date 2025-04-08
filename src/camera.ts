@@ -18,6 +18,10 @@ export class Camera {
     private volumeBounds: number[];
     private volumeDataScale: number;
 
+    /**
+     * Creates a new camera for volume visualization
+     * @param volume The volume to visualize
+     */
     constructor(volume: Volume) {
         this.volumeBounds = volume.boundingBox;
         this.volumeDataScale = volume.boundingBox[2] / volume.size[2];
@@ -69,6 +73,7 @@ export class Camera {
 
     /**
      * Returns the camera transformation matrix
+     * @returns Float32Array representation of the camera matrix
      */
     public getCameraMatrix(): Float32Array { 
         this.calculateViewMatrix(); 
@@ -77,6 +82,7 @@ export class Camera {
     
     /**
      * Returns the view matrix (inverse of camera matrix)
+     * @returns Float32Array representation of the view matrix
      */
     public getViewMatrix(): Float32Array { 
         this.calculateViewMatrix(); 
@@ -85,6 +91,7 @@ export class Camera {
     
     /**
      * Returns the light direction vector
+     * @returns Float32Array representation of the light direction
      */
     public getLightDir(): Float32Array { 
         return this.lightDir as Float32Array; 
@@ -92,23 +99,39 @@ export class Camera {
 
     /**
      * Calculates the center point of the volume
+     * @returns Vector representing the volume center
      */
     private volumeCentre(): vec3 { 
-        return vec3.fromValues(-this.volumeBounds[0] / 2, -this.volumeBounds[1] / 2, -this.volumeBounds[2] / 2); 
+        return vec3.fromValues(
+            -this.volumeBounds[0] / 2, 
+            -this.volumeBounds[1] / 2, 
+            -this.volumeBounds[2] / 2
+        ); 
     }
     
     /**
      * Calculates the center point of the image
+     * @returns Vector representing the image center
      */
     private imageCentre(): vec3 { 
-        return vec3.fromValues(this.imageSize[0] / 2, this.imageSize[1] / 2, 0); 
+        return vec3.fromValues(
+            this.imageSize ? this.imageSize[0] / 2 : 0, 
+            this.imageSize ? this.imageSize[1] / 2 : 0, 
+            0
+        ); 
     }
 
     /**
      * Sets the view direction and up vector, recalculating the side vector
+     * @param viewDir Direction the camera is pointing
+     * @param viewUp Up direction for the camera
      */
     private setViewDir(viewDir: vec3, viewUp: vec3): void {        
-        // Calculate orthogonal vectors
+        // Normalize input vectors
+        vec3.normalize(viewDir, viewDir);
+        vec3.normalize(viewUp, viewUp);
+        
+        // Calculate orthogonal side vector
         const viewSide: vec3 = vec3.create();
         vec3.cross(viewSide, viewDir, viewUp);
         vec3.normalize(viewSide, viewSide);
@@ -124,6 +147,7 @@ export class Camera {
 
     /**
      * Sets the scale factor for the camera
+     * @param s Scale factor (must be positive)
      */
     private setScale(s: number): void {
         if (s > 0) {
@@ -133,6 +157,9 @@ export class Camera {
 
     /**
      * Sets the position in image space
+     * @param x X-coordinate
+     * @param y Y-coordinate
+     * @param z Z-coordinate (cine position)
      */
     private setPanCine(x: number, y: number, z: number): void {
         this.position = vec3.fromValues(x, y, z);
@@ -140,6 +167,7 @@ export class Camera {
 
     /**
      * Updates the position along the z-axis (cine)
+     * @param dz Change in z-position
      */
     public updateCine(dz: number): void {
         this.position[2] += dz;
@@ -147,6 +175,8 @@ export class Camera {
 
     /**
      * Updates the position in the xy-plane (pan)
+     * @param dx Change in x-position
+     * @param dy Change in y-position
      */
     public updatePan(dx: number, dy: number): void {
         this.position[0] += dx / this.scale[0];
@@ -155,6 +185,7 @@ export class Camera {
 
     /**
      * Updates the scale factor
+     * @param ds Change in scale
      */
     public updateScale(ds: number): void {
         if (this.scale[0] + ds > 0) {
@@ -165,6 +196,8 @@ export class Camera {
 
     /**
      * Updates the camera orientation based on rotation angles
+     * @param dx Rotation around up vector (in radians)
+     * @param dy Rotation around side vector (in radians)
      */
     public updateRotation(dx: number, dy: number): void {
         // Rotate around up vector
@@ -180,6 +213,8 @@ export class Camera {
 
     /**
      * Sets the light direction based on longitude and latitude
+     * @param long Longitude angle (in radians)
+     * @param lat Latitude angle (in radians)
      */
     public setLighting(long: number, lat: number): void {
         this.lightDir[0] = Math.cos(lat) * Math.cos(long);
@@ -190,6 +225,8 @@ export class Camera {
 
     /**
      * Updates the light direction by changing longitude and latitude
+     * @param dlong Change in longitude (in radians)
+     * @param dlat Change in latitude (in radians)
      */
     public updateLighting(dlong: number, dlat: number): void {
         const lat = Math.asin(this.lightDir[2]) + dlat;
@@ -199,6 +236,7 @@ export class Camera {
 
     /**
      * Updates the image size when the canvas is resized
+     * @param size New dimensions [width, height]
      */
     public resize(size: number[]): void { 
         this.imageSize = size; 
@@ -206,6 +244,7 @@ export class Camera {
 
     /**
      * Updates volume parameters when the volume changes
+     * @param volume The new volume
      */
     public updateVolume(volume: Volume): void {
         this.volumeBounds = volume.boundingBox;

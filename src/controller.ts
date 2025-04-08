@@ -1,71 +1,104 @@
-import { Camera } from "./camera";
+import { Camera } from './camera';
 
 export class Controller {
     private window: HTMLCanvasElement;
     private camera: Camera;
-    private leftDown: boolean;
-    private updateLightSource: boolean;
-    private rightDown: boolean;
-    private initPos: [number, number];
+    private leftDown: boolean = false;
+    private rightDown: boolean = false;
+    private updateLightSource: boolean = false;
+    private initPos: [number, number] = [0, 0];
 
-    private scaleFactor: number = 1000;
-    private rotationFactor: number = 100;
-    private cineFactor: number = 10;
-    private lightFactor: number = 400;
+    // Sensitivity parameters
+    private readonly scaleFactor: number = 1000;
+    private readonly rotationFactor: number = 100;
+    private readonly cineFactor: number = 10;
+    private readonly lightFactor: number = 400;
+    private readonly panFactor: number = 1;
 
+    /**
+     * Creates a new controller for camera interaction
+     * @param window Canvas element to attach events to
+     * @param camera Camera to control
+     */
     constructor(window: HTMLCanvasElement, camera: Camera) {
         this.window = window;
         this.camera = camera;
-        this.leftDown = false;
-        this.updateLightSource = false;
-        this.initPos = [0, 0];
-        this.initMouse();
-        this.initKeyboard();
+        this.initMouseEvents();
+        this.initKeyboardEvents();
     }
 
-    private initMouse(): void {
-        // Mouse zoom
-        this.window.addEventListener('wheel', (e: WheelEvent) => {
-            e.preventDefault(); // Disables backwards page-navigation on horizontal scroll
-            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) this.camera.updateScale(e.deltaY / this.scaleFactor);
-            else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) this.camera.updateCine(e.deltaX / this.cineFactor);
-        }, { passive: false });
-
-        // Mouse drag
-        this.window.addEventListener('mousedown', (e: MouseEvent) => {
-            if (e.button == 0) this.leftDown = true;
-            else if (e.button == 2) this.rightDown = true;
-            this.initPos = [e.pageX, e.pageY];
-        }, false);
-        this.window.addEventListener('mouseup', (e: MouseEvent) => {
-            if (e.button == 0) this.leftDown = false; 
-            else if (e.button == 2) this.rightDown = false;
-        }, false);
-        this.window.addEventListener('mousemove', (e: MouseEvent) => {
-            const dx = e.pageX - this.initPos[0];
-            const dy = e.pageY - this.initPos[1];
-            if (this.updateLightSource && this.leftDown) this.camera.updateLighting(dx / this.lightFactor, dy / this.lightFactor);
-            else if (!this.updateLightSource && this.leftDown) this.camera.updateRotation(-dx / this.rotationFactor, dy / this.rotationFactor);
-            else if (this.rightDown) this.camera.updatePan(dx, dy);
-            this.initPos = [e.pageX, e.pageY];
-        }, false);
-
-        // Disable right-click menu
-        this.window.oncontextmenu = function (e) {
-            e.preventDefault();
-        };
+    private initMouseEvents(): void {
+        // Mouse wheel for zoom and cine
+        this.window.addEventListener('wheel', this.handleMouseWheel.bind(this), { passive: false });
+        
+        // Mouse buttons and movement
+        this.window.addEventListener('mousedown', this.handleMouseDown.bind(this), false);
+        this.window.addEventListener('mouseup', this.handleMouseUp.bind(this), false);
+        this.window.addEventListener('mousemove', this.handleMouseMove.bind(this), false);
+        
+        // Disable context menu on right-click
+        this.window.oncontextmenu = (e) => e.preventDefault();
     }
 
-    private initKeyboard(): void {
-        document.addEventListener('keydown', (e : KeyboardEvent) => {
-            switch(e.key) {
-                case 'Shift': this.updateLightSource = true; break;
+    private initKeyboardEvents(): void {
+        document.addEventListener('keydown', this.handleKeyDown.bind(this), false);
+        document.addEventListener('keyup', this.handleKeyUp.bind(this), false);
+    }
+
+    private handleMouseWheel(e: WheelEvent): void {
+        e.preventDefault(); // Prevent page scrolling
+        
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            // Vertical scroll - handle zoom
+            this.camera.updateScale(e.deltaY / this.scaleFactor);
+        } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+            // Horizontal scroll - handle cine
+            this.camera.updateCine(e.deltaX / this.cineFactor);
+        }
+    }
+
+    private handleMouseDown(e: MouseEvent): void {
+        if (e.button === 0) {
+            this.leftDown = true;
+        } else if (e.button === 2) {
+            this.rightDown = true;
+        }
+        this.initPos = [e.pageX, e.pageY];
+    }
+
+    private handleMouseUp(e: MouseEvent): void {
+        if (e.button === 0) {
+            this.leftDown = false;
+        } else if (e.button === 2) {
+            this.rightDown = false;
+        }
+    }
+
+    private handleMouseMove(e: MouseEvent): void {
+        const dx = e.pageX - this.initPos[0];
+        const dy = e.pageY - this.initPos[1];
+        
+        if (this.leftDown) {
+            // Update lighting if shift key is held
+            if (this.updateLightSource) {
+                this.camera.updateLighting(dx / this.lightFactor, dy / this.lightFactor);
+            } else {
+                // Rotate view otherwise
+                this.camera.updateRotation(-dx / this.rotationFactor, dy / this.rotationFactor);
             }
-        }, false);
-        document.addEventListener('keyup', (e : KeyboardEvent) => {
-            switch(e.key) {
-                case 'Shift': this.updateLightSource = false; break;
-            }
-        }, false);
+        } else if (this.rightDown) {
+            // Pan view
+            this.camera.updatePan(dx * this.panFactor, dy * this.panFactor);
+        }
+        
+        this.initPos = [e.pageX, e.pageY];
+    }
+
+    private handleKeyDown(e: KeyboardEvent): void {
+        if (e.key === 'Shift') this.updateLightSource = true;
+    }
+
+    private handleKeyUp(e: KeyboardEvent): void {
+        if (e.key === 'Shift') this.updateLightSource = false;
     }
 }

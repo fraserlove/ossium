@@ -1,37 +1,19 @@
 import { Context } from './context';
 import { Camera } from './camera';
 import { Controller } from './controller';
+import { RendererGUI } from './gui';
 import { RendererManager } from './manager';
-import { RendererSettings } from './gui';
 
-const vertices = {
-    vertexSize: 4 * 2, // Byte size of one vertex
-    positionOffset: 0,
-    vertexCount: 6,
-
-    coords: new Float32Array([
-        // Position coordinates
-        1.0,  1.0,
-        1.0, -1.0,
-       -1.0, -1.0,
-        1.0,  1.0,
-       -1.0, -1.0,
-       -1.0,  1.0,
-    ])
-}
-
-export class Renderer {
+export abstract class Renderer {
+    protected manager: RendererManager;
     protected context: Context;
     protected camera: Camera;
     protected controller: Controller;
-    protected settings: RendererSettings;
+    protected gui: RendererGUI;
 
     protected renderID: number;
 
-    protected shaderType: any;
-
     protected uniformBuffer: GPUBuffer;
-    private vertexBuffer: GPUBuffer;
     protected volumeTexture: GPUTexture;
     protected sampler: GPUSampler;
 
@@ -40,14 +22,14 @@ export class Renderer {
 
     protected bindGroupLayout: GPUBindGroupLayout;
     protected bindGroup: GPUBindGroup;
-    private pipeline: GPURenderPipeline;
+    protected pipeline: GPURenderPipeline;
 
-    private commandEncoder: GPUCommandEncoder;
-    private renderPassDescriptor: GPURenderPassDescriptor;
+    protected commandEncoder: GPUCommandEncoder;
+    protected renderPassDescriptor: GPURenderPassDescriptor;
 
     constructor(manager: RendererManager, renderID?: number) {
-        if (renderID != undefined) this.renderID = renderID;
-        else this.renderID = (new Date()).getTime(); // Key in hashmap is time in milliseconds when created
+        this.renderID = renderID ?? Date.now();
+        this.manager = manager;
         this.context = manager.getContext();
         this.camera = new Camera(this.context.getVolume());
         this.controller = new Controller(this.context.newWindow(this.renderID), this.camera);
@@ -57,18 +39,14 @@ export class Renderer {
     }
 
     public start(): void {
-        console.log('RENDERER: Creating Pipelines...');
         this.initPipelineLayouts();
         this.initPipelines();
-        console.log('RENDERER: Initialising Resources...');
         this.initBuffers();
         this.initResources();
         this.initBindGroup();
-        console.log('RENDERER: Rendering...');
     }
 
     protected initPipelineLayouts(): void {
-
         this.bindGroupLayoutEntries.push({ 
             binding: 0, 
             visibility: GPUShaderStage.FRAGMENT, 
@@ -91,30 +69,20 @@ export class Renderer {
     }
 
     private initPipelines(): void {
+        const device = this.context.getDevice();
+        const shaderCode = this.getShaderCode();
+        const shaderModule = device.createShaderModule({ code: shaderCode });
 
-        this.pipeline = this.context.getDevice().createRenderPipeline({
-            layout: this.context.getDevice().createPipelineLayout({
+        this.pipeline = device.createRenderPipeline({
+            layout: device.createPipelineLayout({
                 bindGroupLayouts: [this.bindGroupLayout]
             }),
             vertex: {
-                module: this.context.getDevice().createShaderModule({ code: this.shaderType }),
-                entryPoint: 'vert_main',
-                buffers: [
-                        {
-                        arrayStride: vertices.vertexSize,
-                        attributes: [
-                            {
-                                // Position
-                                shaderLocation: 0,
-                                offset: vertices.positionOffset,
-                                format: 'float32x2',
-                            }
-                        ]
-                    } as GPUVertexBufferLayout
-                ]
+                module: shaderModule,
+                entryPoint: 'vert_main'
             },
             fragment: {
-                module: this.context.getDevice().createShaderModule({ code: this.shaderType }),
+                module: shaderModule,
                 entryPoint: 'frag_main',
                 targets: [{ format: this.context.displayFormat() }]
             }
@@ -122,39 +90,40 @@ export class Renderer {
     }
 
     private initBuffers(): void {
-
-        this.uniformBuffer = this.context.getDevice().createBuffer({
+        const device = this.context.getDevice();
+        
+        this.uniformBuffer = device.createBuffer({
             size: this.getUniformData().byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
-
-        this.vertexBuffer = this.context.getDevice().createBuffer({
-            size: vertices.coords.byteLength,
-            usage: GPUBufferUsage.VERTEX,
-            mappedAtCreation: true
-        });
-        new Float32Array(this.vertexBuffer.getMappedRange()).set(vertices.coords);
-        this.vertexBuffer.unmap();
     }
 
     protected initResources(): void {
-        this.sampler = this.context.getDevice().createSampler({
+        const device = this.context.getDevice();
+        const volume = this.context.getVolume();
+        
+        this.sampler = device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear'
         });
 
-        const volume = this.context.getVolume();
+        // Using 16-bit texture format - red(low bits), green(high bits)
+        const textureFormat = 'rg8unorm';
+        
+        const bytesPerRow = volume.size[0] * volume.bytesPerVoxel;
 
-        this.volumeTexture = this.context.getDevice().createTexture({
+        // Create 3D texture for volume data
+        this.volumeTexture = device.createTexture({
             size: volume.size,
-            format: volume.textureFormat,
+            format: textureFormat,
             usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
             dimension: '3d'
         });
 
+        // Upload volume data to texture
         const imageDataLayout = {
             offset: 0,
-            bytesPerRow: volume.bytesPerLine,
+            bytesPerRow: bytesPerRow,
             rowsPerImage: volume.size[1]
         };
 
@@ -165,12 +134,13 @@ export class Renderer {
             volume.size
         );
 
+        // Setup render pass descriptor
         this.renderPassDescriptor = {
             colorAttachments: [{
                 view: undefined, // set in render loop
                 clearValue: [0.0, 0.0, 0.0, 1.0],
-                loadOp: 'clear' as GPULoadOp,
-                storeOp: 'store' as GPUStoreOp
+                loadOp: 'clear',
+                storeOp: 'store'
             }]
         };
     }
@@ -188,19 +158,20 @@ export class Renderer {
     }
 
     private executePipeline(): void {
-        this.renderPassDescriptor.colorAttachments[0].view = this.context.getGPUContext(this.renderID).getCurrentTexture().createView();
+        this.renderPassDescriptor.colorAttachments[0].view = 
+            this.context.getGPUContext(this.renderID).getCurrentTexture().createView();
+        
         const passEncoder = this.commandEncoder.beginRenderPass(this.renderPassDescriptor);
-        passEncoder.setPipeline(this.pipeline);
+        
         this.context.getQueue().writeBuffer(this.uniformBuffer, 0, this.getUniformData());
+        
+        passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.bindGroup);
-        passEncoder.setVertexBuffer(0, this.vertexBuffer);
-        passEncoder.draw(vertices.vertexCount);
+        passEncoder.draw(3);
         passEncoder.end();
     }
 
-    protected getUniformData(): Float32Array {
-        return this.settings.getSettings();
-    }
+    protected abstract getUniformData(): Float32Array;
 
     public render(): void {
         this.commandEncoder = this.context.getDevice().createCommandEncoder();
@@ -208,10 +179,28 @@ export class Renderer {
         this.context.getQueue().submit([this.commandEncoder.finish()]);
     }
 
-    public resize(size): void {
+    public resize(size: number[]): void {
         this.camera.resize(size);
         this.context.resizeWindow(this.renderID, size);
     }
 
-    public getID(): number { return this.renderID; }
+    public getID(): number { 
+        return this.renderID; 
+    }
+
+    protected abstract getShaderCode(): string;
+
+    public reset(): void {
+        this.camera = new Camera(this.context.getVolume());
+        this.controller = new Controller(this.context.getWindow(this.renderID), this.camera);
+        
+        this.bindGroupEntries = [];
+        this.bindGroupLayoutEntries = [];
+        
+        this.initPipelineLayouts();
+        this.initPipelines();
+        this.initBuffers();
+        this.initResources();
+        this.initBindGroup();
+    }
 }

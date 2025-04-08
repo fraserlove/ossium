@@ -2,13 +2,13 @@ export class TransferFunction {
     // Magic number to identify the transfer function file format
     public static readonly MAGIC_NUMBER = 'TF01';
 
-    public filename: string;
+    public name: string;
     public size: number[];
     public n_colours: number;
     public data: ArrayBuffer;
     
-    constructor(filename?: string) {
-        this.filename = filename || '';
+    constructor(name?: string) {
+        this.name = name || '';
         this.size = [1, 1];
         this.n_colours = 1;
         this.data = new ArrayBuffer(0);

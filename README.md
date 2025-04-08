@@ -15,6 +15,16 @@ yarn dev
 ```
 The application runs on port `8081` and can be accessed in the browser by going to `http://localhost:8081`.
 
+### Generating a Transfer Function
+
+The transfer function is a 1D texture that maps the intensity values of the volume to colours. It is stored in a file with the `.tf` extension.
+
+To generate a transfer function, run the following command:
+```sh
+python scripts/tf_generator.py
+```
+This will generate a transfer function file with the default settings. The transfer function can then be loaded into the application using the `Load Transfer Function` button in the GUI.
+
 ### Keybindings
 
 | Action | Controls |

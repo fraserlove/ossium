@@ -1,5 +1,5 @@
 import { Renderer } from './renderer';
-import { SettingsSVR } from './gui';
+import { SVRGUI } from './gui';
 import svr from '../shaders/svr.wgsl';
 import { RendererManager } from './manager';
 
@@ -9,8 +9,11 @@ export class RendererSVR extends Renderer {
 
     constructor(manager: RendererManager, renderID?: number) {
         super(manager, renderID);
-        this.shaderType = svr;
-        this.settings = new SettingsSVR(this.renderID, manager);
+        this.gui = new SVRGUI(this.renderID, manager);
+    }
+
+    protected getShaderCode(): string {
+        return svr;
     }
 
     protected initPipelineLayouts(): void {
@@ -37,7 +40,7 @@ export class RendererSVR extends Renderer {
             dimension: '1d'
         });
 
-        // Calculate bytesPerRow (4 bytes per component × 4 components × width)
+        // Calculate bytesPerRow (4 bytes per component * 4 components * width)
         const bytesPerRow = tf.n_colours * 4 * 4;
         
         const imageDataLayout = {
@@ -81,17 +84,16 @@ export class RendererSVR extends Renderer {
         uniformData.set(this.context.getVolume().boundingBox, 20);
 
         // Set light colour (vec3 + padding)
-        uniformData.set((this.settings as SettingsSVR).getColour(), 24);
+        uniformData.set((this.gui as SVRGUI).getColour(), 24);
         
         // Set brightness, shininess and ambient
-        const settings = (this.settings as SettingsSVR).getSettings();
-        uniformData[27] = settings[0];  // brightness
-        uniformData[28] = settings[1];  // shininess
-        uniformData[29] = settings[2];  // ambient
+        const settings = (this.gui as SVRGUI).getSettings();
+        uniformData[27] = settings[0]; // brightness
+        uniformData[28] = settings[1]; // shininess
+        uniformData[29] = settings[2]; // ambient
         
-        // Set transfer function width and bits per voxel
+        // Set transfer function width
         uniformData[30] = this.context.getTransferFunction().n_colours;
-        uniformData[31] = this.context.getVolume().bitsPerVoxel;
         
         return uniformData;
     }

@@ -4,24 +4,17 @@ import { TransferFunction } from './transfer_function';
 export class Context {
     private volume: Volume;
     private transferFunction: TransferFunction;
-    private volumeIDs: string[];
-    private transferFunctionIDs: string[];
+    private volumeIDs: string[] = [];
+    private transferFunctionIDs: string[] = [];
     private adapter: GPUAdapter;
     private device: GPUDevice;
     private queue: GPUQueue;
 
-    private containers: Map<number, HTMLDivElement>;
-    private windows: Map<number, HTMLCanvasElement>;
-    private contexts: Map<number, GPUCanvasContext>;
+    private containers = new Map<number, HTMLDivElement>();
+    private windows = new Map<number, HTMLCanvasElement>();
+    private contexts = new Map<number, GPUCanvasContext>();
 
     constructor() {
-        this.volumeIDs = [];
-        this.transferFunctionIDs = [];
-        this.containers = new Map<number, HTMLDivElement>();
-        this.windows = new Map<number, HTMLCanvasElement>();
-        this.contexts = new Map<number, GPUCanvasContext>();
-        
-        // Initialize with empty volume and transfer function
         this.volume = new Volume();
         this.transferFunction = new TransferFunction();
     }
@@ -37,72 +30,120 @@ export class Context {
     public getGPUContext(id: number): GPUCanvasContext { return this.contexts.get(id); }
     public displayFormat(): GPUTextureFormat { return navigator.gpu.getPreferredCanvasFormat(); }
 
-    public async loadVolume(files: File[]): Promise<void> {
+    /**
+     * Loads a volume from files
+     * @param files Files containing volume data
+     */
+    public async loadVolume(files: File[], folderName: string): Promise<void> {
         try {
-            const volume = new Volume(files[0].name);
+            const volume = new Volume(folderName);
             await volume.load(files);
             this.volume = volume;
-            if (!this.volumeIDs.includes(volume.filename)) {
-                this.volumeIDs.push(volume.filename);
+            
+            if (!this.volumeIDs.includes(volume.name)) {
+                this.volumeIDs.push(volume.name);
             }
-            console.log('CONTEXT: Loaded Volume ' + this.volume.filename);
+            
+            console.log(`CONTEXT: Loaded Volume ${this.volume.name}`);
         } catch (error) {
             console.error('Failed to load volume:', error);
         }
     }
 
+    /**
+     * Loads a transfer function from a file
+     * @param file File containing transfer function data
+     */
     public async loadTransferFunction(file: File): Promise<void> {
         try {
             const tf = new TransferFunction(file.name);
             await tf.load(file);
             this.transferFunction = tf;
-            if (!this.transferFunctionIDs.includes(tf.filename)) {
-                this.transferFunctionIDs.push(tf.filename);
+            
+            if (!this.transferFunctionIDs.includes(tf.name)) {
+                this.transferFunctionIDs.push(tf.name);
             }
-            console.log('CONTEXT: Loaded Transfer Function ' + this.transferFunction.filename);
+            
+            console.log(`CONTEXT: Loaded Transfer Function ${this.transferFunction.name}`);
         } catch (error) {
             console.error('Failed to load transfer function:', error);
         }
     }
 
+    /**
+     * Creates a new window for rendering
+     * @param renderID Unique ID for the renderer
+     * @returns The created canvas element
+     */
     public newWindow(renderID: number): HTMLCanvasElement {
-        let container = document.createElement('div');
+        const container = document.createElement('div');
         container.id = 'container';
         this.containers.set(renderID, container);
 
-        let window = document.createElement('canvas');
-        this.windows.set(renderID, window);
+        const canvas = document.createElement('canvas');
+        this.windows.set(renderID, canvas);
 
-        let context = window.getContext('webgpu');
-        context.configure({ device: this.device, format: this.displayFormat(), alphaMode: 'premultiplied' });
+        const context = canvas.getContext('webgpu');
+        if (!context) {
+            throw new Error('Failed to get WebGPU context');
+        }
+        
+        context.configure({ 
+            device: this.device, 
+            format: this.displayFormat(), 
+            alphaMode: 'premultiplied' 
+        });
+        
         this.contexts.set(renderID, context);
             
-        container.appendChild(window);
+        container.appendChild(canvas);
         document.body.appendChild(container);
-        return window;
+        return canvas;
     }
 
+    /**
+     * Removes a window and its associated resources
+     * @param id ID of the window to remove
+     */
     public removeWindow(id: number): void {
-        this.containers.get(id).remove();
-        this.containers.delete(id);
-        this.windows.delete(id);
-        this.contexts.delete(id);
+        const container = this.containers.get(id);
+        if (container) {
+            container.remove();
+            this.containers.delete(id);
+            this.windows.delete(id);
+            this.contexts.delete(id);
+        }
     }
 
-    public resizeWindow(id: number, size: number[]): void { 
-        this.windows.get(id).width = size[0];
-        this.windows.get(id).height = size[1];
+    /**
+     * Resizes a window to the specified dimensions
+     * @param id ID of the window to resize
+     * @param size New dimensions [width, height]
+     */
+    public resizeWindow(id: number, size: number[]): void {
+        const window = this.windows.get(id);
+        if (window) {
+            window.width = size[0];
+            window.height = size[1];
+        }
     }
 
+    /**
+     * Initialises WebGPU
+     * @returns True if initialisation was successful, false otherwise
+     */
     public async initWebGPU(): Promise<boolean> {
         try {
             this.adapter = await navigator.gpu.requestAdapter();
+            if (!this.adapter) {
+                throw new Error('No GPU adapter found');
+            }
             
             // Check adapter limits and request higher buffer size limit
             const adapterLimits = this.adapter.limits;
             const requiredLimits = {
-                maxStorageBufferBindingSize: Math.min(4294967296, adapterLimits.maxStorageBufferBindingSize),
-                maxBufferSize: Math.min(4294967296, adapterLimits.maxStorageBufferBindingSize)
+                maxStorageBufferBindingSize: adapterLimits.maxStorageBufferBindingSize,
+                maxBufferSize: adapterLimits.maxStorageBufferBindingSize
             };
             
             this.device = await this.adapter.requestDevice({
@@ -110,13 +151,13 @@ export class Context {
             });
             
             this.queue = this.device.queue;
+            console.log('CONTEXT: Initialised WebGPU.');
+            return true;
         }
         catch(error) {
             console.error(error);
             console.log('CONTEXT: WebGPU Not Supported.');
             return false;
         }
-        console.log('CONTEXT: Initialised WebGPU.');
-        return true;
     }
 }
