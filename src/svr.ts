@@ -30,18 +30,16 @@ export class RendererSVR extends Renderer {
 
         // Calculate dimensions for transfer function texture
         const tf = this.context.getTransferFunction();
-
-        tf.resize(this.context.getDevice().limits.maxTextureDimension1D);
         
         this.transferFunctionTexture = this.context.getDevice().createTexture({
-            size: tf.size,
+            size: [tf.size],
             format: 'rgba32float',
             usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
             dimension: '1d'
         });
 
-        // Calculate bytesPerRow (4 bytes per component * 4 components * width)
-        const bytesPerRow = tf.n_colours * 4 * 4;
+        // Calculate bytesPerRow (4 bytes per component * 4 components * size[0])
+        const bytesPerRow = tf.size * 4 * 4;
         
         const imageDataLayout = {
             offset: 0,
@@ -53,7 +51,7 @@ export class RendererSVR extends Renderer {
             { texture: this.transferFunctionTexture },
             tf.data,
             imageDataLayout,
-            tf.size
+            [tf.size]
         );
     }
 
@@ -82,18 +80,13 @@ export class RendererSVR extends Renderer {
         
         // Set bounding box (vec3 + padding)
         uniformData.set(this.context.getVolume().boundingBox, 20);
-
-        // Set light colour (vec3 + padding)
-        uniformData.set((this.gui as SVRGUI).getColour(), 24);
         
-        // Set brightness, shininess and ambient
+        // Set lighting attributes
         const settings = (this.gui as SVRGUI).getSettings();
-        uniformData[27] = settings[0]; // brightness
-        uniformData[28] = settings[1]; // shininess
-        uniformData[29] = settings[2]; // ambient
+        uniformData.set(settings, 24);
         
-        // Set transfer function width
-        uniformData[30] = this.context.getTransferFunction().n_colours;
+        // Set transfer function size
+        uniformData[30] = this.context.getTransferFunction().size;
         
         return uniformData;
     }

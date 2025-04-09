@@ -3,14 +3,12 @@ export class TransferFunction {
     public static readonly MAGIC_NUMBER = 'TF01';
 
     public name: string;
-    public size: number[];
-    public n_colours: number;
+    public size: number;
     public data: ArrayBuffer;
     
     constructor(name?: string) {
         this.name = name || '';
-        this.size = [1, 1];
-        this.n_colours = 1;
+        this.size = 1;
         this.data = new ArrayBuffer(0);
     }
 
@@ -24,14 +22,10 @@ export class TransferFunction {
             throw new Error('Invalid transfer function');
         }
 
-        // Read n_colours (4 bytes after magic number)
-        this.n_colours = view.getUint32(4, true);
+        // Read size of transfer function (4 bytes after magic number)
+        this.size = view.getUint32(4, true);
         
         // Store the remaining data (color data)
-        this.data = buffer.slice(8); // Skip magic number and n_colours
-    }
-
-    public resize(limit: number): void {
-        this.size = [limit, Math.ceil(this.n_colours / limit)];
+        this.data = buffer.slice(8); // Skip magic number and size
     }
 }

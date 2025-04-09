@@ -89,7 +89,7 @@ export class MPRGUI extends RendererGUI {
 
     constructor(renderID: number, manager: RendererManager) {
         super(renderID, manager);
-        this.gui.title('MPR Settings');
+        this.gui.title('MPR');
         
         this.gui.add(this, 'windowWidth', 0, 0.05, 0.0001).name('Window Width');
         this.gui.add(this, 'windowLevel', 0.48, 0.52, 0.0001).name('Window Level');
@@ -102,29 +102,23 @@ export class MPRGUI extends RendererGUI {
 }
 
 export class SVRGUI extends RendererGUI {
-    private shininess: number = 50;
-    private brightness: number = 1;
-    private lightColour: number[] = [1, 1, 1];
-    private includeSpecular: boolean = true;
+    private diffuse: number = 1;
+    private specular: number = 0.5;
     private ambient: number = 0.3;
+    private lightColour: number[] = [1, 1, 1];
 
     constructor(renderID: number, manager: RendererManager) {
         super(renderID, manager);
-        this.gui.title('SVR Settings');
+        this.gui.title('SVR');
 
-        this.gui.add(this, 'shininess', 0, 100).name('Shininess');
-        this.gui.add(this, 'brightness', 0, 2).name('Brightness');
-        this.gui.add(this, 'ambient', 0, 1).name('Ambient Light');
+        this.gui.add(this, 'diffuse', 0, 1).name('Diffuse');
+        this.gui.add(this, 'specular', 0, 1).name('Specular');
+        this.gui.add(this, 'ambient', 0, 1).name('Ambient');
         this.gui.addColor(this, 'lightColour').name('Light Colour');
-        this.gui.add(this, 'includeSpecular').name('Include Specular');
         this.gui.add({ destroyRenderer: () => manager.destroyRenderer(this.renderID) }, 'destroyRenderer').name('Delete');
     }
 
-    public getColour(): number[] {
-        return this.includeSpecular ? this.lightColour : [0, 0, 0];
-    }
-
-    public getSettings(): Float32Array { 
-        return new Float32Array([this.brightness, this.shininess, this.ambient]); 
+    public getSettings(): Float32Array {
+        return new Float32Array([...this.lightColour, this.diffuse, this.specular, this.ambient]); 
     }
 }

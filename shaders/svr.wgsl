@@ -3,8 +3,8 @@ struct Uniforms {
     lightPos: vec3<f32>,
     bbox: vec3<f32>,
     lightColour: vec3<f32>,
-    brightness: f32,
-    shininess: f32,
+    diffuse: f32,
+    specular: f32,
     ambient: f32,
     tfSize: f32,
 };
@@ -51,6 +51,7 @@ fn normal(pos: vec3<f32>) -> vec3<f32> {
 fn frag_main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
     var size = vec3<f32>(textureDimensions(volumeTexture));
     var accColour = vec4<f32>(0.0, 0.0, 0.0, 0.0);  // Accumulated color (RGBA)
+    let shininess = 10.0;  // Shininess factor for specular calculation
 
     // Calculate ray origin and direction in volume space
     var pos = uniforms.transform * vec4<f32>(coord.xy, 0.0, 1.0); // Ray origin
@@ -77,12 +78,13 @@ fn frag_main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
             var halfDir = normalize(lightDir + viewDir);
             
             // Calculate lighting components
-            var diffuse = max(0.0, dot(norm, lightDir));
-            var specular = pow(max(0.0, dot(norm, halfDir)), uniforms.shininess);
+            var diffuse = max(0.0, dot(norm, lightDir)) * uniforms.diffuse;
+            var specular = pow(max(0.0, dot(norm, halfDir)), shininess) * uniforms.specular;
+            var ambient = uniforms.ambient;
             
-            // Apply lighting and brightness with ambient term
-            var litColor = colour.rgb * diffuse + uniforms.ambient * colour.rgb * uniforms.lightColour + specular * uniforms.lightColour;
-            colour = vec4<f32>(litColor * uniforms.brightness, colour.a);
+            // Apply lighting with light color
+            var litColor = uniforms.lightColour * (colour.rgb * (diffuse + ambient) + specular);
+            colour = vec4<f32>(litColor, colour.a);
 
             // Front-to-back composition using alpha blending
             var alpha = (1.0 - accColour.a) * colour.a;

@@ -14,16 +14,15 @@ export class RendererMPR extends Renderer {
     }
 
     protected getUniformData(): Float32Array {
-        // Create uniform buffer with 16-byte alignment (80 bytes)
+        // Create uniform buffer with 16-byte alignment (80 bytes) - https://www.w3.org/TR/WGSL/#alignment-and-size
         const uniformData = new Float32Array(20);
         
-        // Copy view matrix (16 elements)
+        // Set view matrix (16 floats)
         uniformData.set(this.camera.getViewMatrix(), 0);
         
-        // Add window settings and volume metadata
-        const [width, level] = (this.gui as MPRGUI).getSettings();
-        uniformData[16] = width;
-        uniformData[17] = level;
+        // Add window attributes
+        const settings = (this.gui as MPRGUI).getSettings();
+        uniformData.set(settings, 16);
         
         return uniformData;
     }

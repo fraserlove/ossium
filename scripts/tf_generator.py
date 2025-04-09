@@ -79,11 +79,11 @@ class TransferFunction:
 
 def create_basic_tf(n_colours: int = 8192, output_path: str = 'basic.tf') -> None:
     """
-    Create a transfer function for basic visualization
+    Create a transfer function for basic visualisation
     
     Args:
         n_colours: number of colours in the transfer function (default 8192)
-        output_path: where to save the transfer function file (default 'blood.tf')
+        output_path: where to save the transfer function file (default 'basic.tf')
     
     The transfer function is designed to show only blood vessels and bone:
     - Air/Background: fully transparent
