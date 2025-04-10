@@ -1,9 +1,12 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec3, quat } from 'gl-matrix';
 import { Volume } from './volume';
 
 export class Camera {
     private _forward: vec3 = vec3.fromValues(0, 0, 1);
     private _up: vec3 = vec3.fromValues(0, 1, 0);
+
+    private _target: vec3;
+    private _distance: number;
 
     private _pan: vec3 = vec3.fromValues(0, 0, 0);
     private _zoom: vec3 = vec3.fromValues(1, 1, 1);
@@ -12,17 +15,26 @@ export class Camera {
 
     private _lightDirection: vec3 = vec3.fromValues(0, 1, 0);
 
-    private volumeBounds: number[];
-    private volumeScale: number[];
+    private volumeBounds: vec3;
+    private volumeScale: vec3;
     
     /**
      * Creates a new camera for volume visualization
-     * @param volume The volume to visualize
+     * @param volumeBounds The bounds of the volume
+     * @param volumeScale The scale of the volume
      */
-    constructor(volume: Volume) {
-        this.volumeScale = volume.scale;
-        this.volumeBounds = volume.bounds;
-        this._pan = vec3.fromValues(0, 0, this.volumeBounds.reduce((acc, val) => acc + val, 0));
+    constructor(volumeBounds: number[], volumeScale: number[]) {
+        this.volumeBounds = vec3.fromValues(...(volumeBounds as [number, number, number]));
+        this.volumeScale = vec3.fromValues(...(volumeScale as [number, number, number]));
+        this._pan = vec3.fromValues(0, 0, 1000);
+
+        this._target = vec3.fromValues(
+            this.volumeBounds[0] / 2,
+            this.volumeBounds[1] / 2,
+            this.volumeBounds[2] / 2
+        );
+
+        this._distance = vec3.length(this.volumeBounds);
     }
 
     public get lightDirection(): vec3 { return this._lightDirection; }
@@ -31,7 +43,7 @@ export class Camera {
      * Returns the view matrix
      * @returns The current view matrix
      */
-       public get view(): mat4 { 
+    public get view(): mat4 { 
         // Calculate right vector from forward and up vectors
         const right = vec3.create();
         vec3.cross(right, this._up, this._forward);
@@ -126,8 +138,6 @@ export class Camera {
         
         vec3.transformMat4(this._lightDirection, this._lightDirection, rotX);
         vec3.transformMat4(this._lightDirection, this._lightDirection, rotY);
-        
-        vec3.normalize(this._lightDirection, this._lightDirection);
     }
 
     /**
@@ -137,15 +147,5 @@ export class Camera {
     public resize(size: number[]): void {  
         this._pan[0] = size[0] / 2;
         this._pan[1] = size[1] / 2;
-    }
-
-    /**
-     * Updates volume parameters when the volume changes
-     * @param volume The new volume
-     */
-    public updateVolume(volume: Volume): void {
-        this.volumeScale = volume.scale;
-        this.volumeBounds = volume.bounds;
-        this._pan[2] = this.volumeBounds.reduce((acc, val) => acc + val, 0);
     }
 }

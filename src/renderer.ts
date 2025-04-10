@@ -33,7 +33,8 @@ export abstract class Renderer {
         this.renderID = renderID ?? Date.now();
         this.manager = manager;
         this.context = manager.getContext();
-        this.camera = new Camera(this.context.getVolume());
+        const volume = this.context.getVolume();
+        this.camera = new Camera(volume.bounds, volume.scale);
         this.controller = new Controller(this.context.newWindow(this.renderID), this.camera);
 
         this.bindGroupEntries = [];
@@ -189,7 +190,8 @@ export abstract class Renderer {
     }
 
     public reset(): void {
-        this.camera = new Camera(this.context.getVolume());
+        const volume = this.context.getVolume();
+        this.camera = new Camera(volume.bounds, volume.scale);
         this.controller = new Controller(this.context.getWindow(this.renderID), this.camera);
         
         this.bindGroupEntries = [];
