@@ -2,99 +2,64 @@ import { mat4, vec3 } from 'gl-matrix';
 import { Volume } from './volume';
 
 export class Camera {
-    private viewDir: vec3;  // x-axis for camera (towards volume)
-    private viewUp: vec3;   // y-axis for camera (upwards from top of camera)
-    private viewSide: vec3; // z-axis for camera (parallel to image plane)
+    private _forward: vec3 = vec3.fromValues(0, 0, 1);
+    private _up: vec3 = vec3.fromValues(0, 1, 0);
 
-    private position: vec3; // Position in image space (pan/cine)
-    private scale: vec3;    // Scale factors for x, y, z
+    private _pan: vec3 = vec3.fromValues(0, 0, 0);
+    private _zoom: vec3 = vec3.fromValues(1, 1, 1);
 
-    private camera: mat4;
-    private view: mat4;
+    private _view: mat4 = mat4.create();
 
-    private lightDir: vec3;
+    private _lightDirection: vec3 = vec3.fromValues(0, 1, 0);
 
-    private imageSize: number[];
     private volumeBounds: number[];
-    private volumeDataScale: number;
-
+    private volumeScale: number[];
+    
     /**
      * Creates a new camera for volume visualization
      * @param volume The volume to visualize
      */
     constructor(volume: Volume) {
-        this.volumeBounds = volume.boundingBox;
-        this.volumeDataScale = volume.boundingBox[2] / volume.size[2];
-
-        this.viewDir = vec3.create();
-        this.viewUp = vec3.create();
-        this.viewSide = vec3.create();
-        this.position = vec3.create();
-        this.scale = vec3.create();
-        this.camera = mat4.create();
-        this.view = mat4.create();
-        this.lightDir = vec3.create();
-
-        // Set default values
-        this.setLighting(1, 0);
-        this.setScale(0.4);
-        this.setPanCine(0, 0, this.volumeBounds[2] / 2);
-        this.setViewDir(vec3.fromValues(0, 1, 0), vec3.fromValues(0, 0, 1));
+        this.volumeScale = volume.scale;
+        this.volumeBounds = volume.bounds;
+        this._pan = vec3.fromValues(0, 0, this.volumeBounds.reduce((acc, val) => acc + val, 0));
     }
 
+    public get lightDirection(): vec3 { return this._lightDirection; }
+    
     /**
-     * Calculates the view matrix based on current camera parameters
+     * Returns the view matrix
+     * @returns The current view matrix
      */
-    private calculateViewMatrix(): void {
-        this.camera = mat4.create();
+       public get view(): mat4 { 
+        // Calculate right vector from forward and up vectors
+        const right = vec3.create();
+        vec3.cross(right, this._up, this._forward);
+        vec3.normalize(right, right);
 
-        const viewBasisMatrix: mat4 = mat4.fromValues(
-            this.viewSide[0], this.viewUp[0], this.viewDir[0], 0,
-            this.viewSide[1], this.viewUp[1], this.viewDir[1], 0,
-            this.viewSide[2], this.viewUp[2], this.viewDir[2], 0,
+        // Create view basis matrix (camera orientation)
+        const viewBasis = mat4.fromValues(
+            right[0], this._up[0], this._forward[0], 0,
+            right[1], this._up[1], this._forward[1], 0,
+            right[2], this._up[2], this._forward[2], 0,
             0, 0, 0, 1
         );
-        
-        // Scale z-axis according to volume-to-data ratio
-        mat4.multiply(this.camera, mat4.fromScaling(mat4.create(), vec3.fromValues(1, 1, this.volumeDataScale)), this.camera);
-        // Centre volume at origin
-        mat4.multiply(this.camera, mat4.fromTranslation(mat4.create(), this.volumeCentre()), this.camera);
-        // Apply rotation
-        mat4.multiply(this.camera, viewBasisMatrix, this.camera);
-        // Apply translation (pan/cine)
-        mat4.multiply(this.camera, mat4.fromTranslation(mat4.create(), this.position), this.camera);
-        // Apply scaling
-        mat4.multiply(this.camera, mat4.fromScaling(mat4.create(), this.scale), this.camera);
-        // Centre image in window
-        mat4.multiply(this.camera, mat4.fromTranslation(mat4.create(), this.imageCentre()), this.camera);
-        
-        mat4.invert(this.view, this.camera);
-    }
 
-    /**
-     * Returns the camera transformation matrix
-     * @returns Float32Array representation of the camera matrix
-     */
-    public getCameraMatrix(): Float32Array { 
-        this.calculateViewMatrix(); 
-        return this.camera as Float32Array; 
-    }
-    
-    /**
-     * Returns the view matrix (inverse of camera matrix)
-     * @returns Float32Array representation of the view matrix
-     */
-    public getViewMatrix(): Float32Array { 
-        this.calculateViewMatrix(); 
-        return this.view as Float32Array; 
-    }
-    
-    /**
-     * Returns the light direction vector
-     * @returns Float32Array representation of the light direction
-     */
-    public getLightDir(): Float32Array { 
-        return this.lightDir as Float32Array; 
+        const camera = mat4.create();
+
+        // Scale z-axis according to volume-to-data ratio
+        mat4.multiply(camera, mat4.fromScaling(mat4.create(), vec3.fromValues(this.volumeScale[0], this.volumeScale[1], this.volumeScale[2])), camera);
+        // Ensure (0, 0, 0) is the centre of the volume
+        mat4.translate(camera, camera, this.volumeCentre());
+        // Apply rotation
+        mat4.multiply(camera, viewBasis, camera);
+        // Apply zoom
+        mat4.multiply(camera, mat4.fromScaling(mat4.create(), this._zoom), camera);
+        // Apply pan
+        mat4.multiply(camera, mat4.fromTranslation(mat4.create(), this._pan), camera);
+        
+        mat4.invert(this._view, camera);
+        return this._view; 
     }
 
     /**
@@ -108,138 +73,70 @@ export class Camera {
             -this.volumeBounds[2] / 2
         ); 
     }
-    
+
     /**
-     * Calculates the center point of the image
-     * @returns Vector representing the image center
+     * Updates the pan in the xy-plane (pan)
+     * @param delta Change in pan [dx, dy]
      */
-    private imageCentre(): vec3 { 
-        return vec3.fromValues(
-            this.imageSize ? this.imageSize[0] / 2 : 0, 
-            this.imageSize ? this.imageSize[1] / 2 : 0, 
-            0
-        ); 
+    public set pan(delta: [number, number]) {
+        this._pan[0] += delta[0] / this._zoom[0];
+        this._pan[1] += delta[1] / this._zoom[1];
     }
 
     /**
-     * Sets the view direction and up vector, recalculating the side vector
-     * @param viewDir Direction the camera is pointing
-     * @param viewUp Up direction for the camera
+     * Updates the zoom factor
+     * @param delta Change in zoom
      */
-    private setViewDir(viewDir: vec3, viewUp: vec3): void {        
-        // Normalize input vectors
-        vec3.normalize(viewDir, viewDir);
-        vec3.normalize(viewUp, viewUp);
-        
-        // Calculate orthogonal side vector
-        const viewSide: vec3 = vec3.create();
-        vec3.cross(viewSide, viewDir, viewUp);
-        vec3.normalize(viewSide, viewSide);
-        
-        // Recalculate up vector to ensure orthogonality
-        vec3.cross(this.viewUp, viewDir, viewSide);
-        vec3.normalize(this.viewUp, this.viewUp);
-        
-        // Set camera orientation vectors
-        vec3.copy(this.viewDir, viewDir);
-        vec3.copy(this.viewSide, viewSide);
-    }
-
-    /**
-     * Sets the scale factor for the camera
-     * @param s Scale factor (must be positive)
-     */
-    private setScale(s: number): void {
-        if (s > 0) {
-            this.scale = vec3.fromValues(s, s, 1);
-        }
-    }
-
-    /**
-     * Sets the position in image space
-     * @param x X-coordinate
-     * @param y Y-coordinate
-     * @param z Z-coordinate (cine position)
-     */
-    private setPanCine(x: number, y: number, z: number): void {
-        this.position = vec3.fromValues(x, y, z);
-    }
-
-    /**
-     * Updates the position along the z-axis (cine)
-     * @param dz Change in z-position
-     */
-    public updateCine(dz: number): void {
-        this.position[2] += dz;
-    }
-
-    /**
-     * Updates the position in the xy-plane (pan)
-     * @param dx Change in x-position
-     * @param dy Change in y-position
-     */
-    public updatePan(dx: number, dy: number): void {
-        this.position[0] += dx / this.scale[0];
-        this.position[1] += dy / this.scale[1];
-    }
-
-    /**
-     * Updates the scale factor
-     * @param ds Change in scale
-     */
-    public updateScale(ds: number): void {
-        if (this.scale[0] + ds > 0) {
-            this.scale[0] += ds;
-            this.scale[1] += ds;
+    public set zoom(delta: number) {
+        if (this._zoom[0] + delta > 0) {
+            this._zoom[0] += delta;
+            this._zoom[1] += delta;
         }
     }
 
     /**
      * Updates the camera orientation based on rotation angles
-     * @param dx Rotation around up vector (in radians)
-     * @param dy Rotation around side vector (in radians)
+     * @param delta Change in rotation [dx, dy]
      */
-    public updateRotation(dx: number, dy: number): void {
-        // Rotate around up vector
-        const rotX = mat4.fromRotation(mat4.create(), dx, this.viewUp);
-        vec3.transformMat4(this.viewDir, this.viewDir, rotX);
-        vec3.transformMat4(this.viewSide, this.viewSide, rotX);
+    public set rotation(delta: [number, number]) {
+        // Calculate right vector
+        const right = vec3.create();
+        vec3.cross(right, this._forward, this._up);
         
-        // Rotate around side vector
-        const rotY = mat4.fromRotation(mat4.create(), dy, this.viewSide);
-        vec3.transformMat4(this.viewDir, this.viewDir, rotY);
-        vec3.transformMat4(this.viewUp, this.viewUp, rotY);
+        // Rotate around up vector (y-axis)
+        const rotY = mat4.fromRotation(mat4.create(), delta[0], this._up);
+        vec3.transformMat4(this._forward, this._forward, rotY);
+        
+        // Rotate around right vector (x-axis)
+        const rotX = mat4.fromRotation(mat4.create(), delta[1], right);
+        vec3.transformMat4(this._up, this._up, rotX);
+        vec3.transformMat4(this._forward, this._forward, rotX);
     }
 
     /**
-     * Sets the light direction based on longitude and latitude
-     * @param long Longitude angle (in radians)
-     * @param lat Latitude angle (in radians)
+     * Updates the light direction
+     * @param delta Change in light direction [dx, dy]
      */
-    public setLighting(long: number, lat: number): void {
-        this.lightDir[0] = Math.cos(lat) * Math.cos(long);
-        this.lightDir[1] = Math.cos(lat) * Math.sin(long);
-        this.lightDir[2] = Math.sin(lat);
-        vec3.normalize(this.lightDir, this.lightDir);
+    public set lighting(delta: [number, number]) {
+        // Rotate around y-axis for horizontal movement
+        const rotX = mat4.fromRotation(mat4.create(), delta[0], [0, 1, 0]);
+        
+        // Rotate around x-axis for vertical movement
+        const rotY = mat4.fromRotation(mat4.create(), delta[1], [1, 0, 0]);
+        
+        vec3.transformMat4(this._lightDirection, this._lightDirection, rotX);
+        vec3.transformMat4(this._lightDirection, this._lightDirection, rotY);
+        
+        vec3.normalize(this._lightDirection, this._lightDirection);
     }
 
     /**
-     * Updates the light direction by changing longitude and latitude
-     * @param dlong Change in longitude (in radians)
-     * @param dlat Change in latitude (in radians)
-     */
-    public updateLighting(dlong: number, dlat: number): void {
-        const lat = Math.asin(this.lightDir[2]) + dlat;
-        const long = Math.atan2(this.lightDir[1], this.lightDir[0]) + dlong;
-        this.setLighting(long, lat);
-    }
-
-    /**
-     * Updates the image size when the canvas is resized
+     * Updates the pan to center the image when the canvas is resized
      * @param size New dimensions [width, height]
      */
-    public resize(size: number[]): void { 
-        this.imageSize = size; 
+    public resize(size: number[]): void {  
+        this._pan[0] = size[0] / 2;
+        this._pan[1] = size[1] / 2;
     }
 
     /**
@@ -247,7 +144,8 @@ export class Camera {
      * @param volume The new volume
      */
     public updateVolume(volume: Volume): void {
-        this.volumeBounds = volume.boundingBox;
-        this.volumeDataScale = volume.boundingBox[2] / volume.size[2];
+        this.volumeScale = volume.scale;
+        this.volumeBounds = volume.bounds;
+        this._pan[2] = this.volumeBounds.reduce((acc, val) => acc + val, 0);
     }
 }

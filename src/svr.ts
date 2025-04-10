@@ -10,10 +10,7 @@ export class RendererSVR extends Renderer {
     constructor(manager: RendererManager, renderID?: number) {
         super(manager, renderID);
         this.gui = new SVRGUI(this.renderID, manager);
-    }
-
-    protected getShaderCode(): string {
-        return svr;
+        this._shaderCode = svr;
     }
 
     protected initPipelineLayouts(): void {
@@ -73,20 +70,17 @@ export class RendererSVR extends Renderer {
         const uniformData = new Float32Array(32);
         
         // Set view matrix (16 floats)
-        uniformData.set(this.camera.getViewMatrix(), 0);
+        uniformData.set(this.camera.view, 0);
         
         // Set light position (vec3 + padding)
-        uniformData.set(this.camera.getLightDir(), 16);
-        
-        // Set bounding box (vec3 + padding)
-        uniformData.set(this.context.getVolume().boundingBox, 20);
+        uniformData.set(this.camera.lightDirection, 16);
         
         // Set lighting attributes
         const settings = (this.gui as SVRGUI).getSettings();
-        uniformData.set(settings, 24);
+        uniformData.set(settings, 20);
         
         // Set transfer function size
-        uniformData[30] = this.context.getTransferFunction().size;
+        uniformData[26] = this.context.getTransferFunction().size;
         
         return uniformData;
     }

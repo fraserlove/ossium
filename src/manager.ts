@@ -32,7 +32,7 @@ export class RendererManager {
 
     private async addRenderer(renderer: Renderer, renderID?: number): Promise<void> {
         if (renderID != undefined) this.renderers.set(renderID, renderer);
-        else this.renderers.set(renderer.getID(), renderer);
+        else this.renderers.set(renderer.id, renderer);
         this.resize();
         await renderer.start();
     }

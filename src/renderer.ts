@@ -27,6 +27,8 @@ export abstract class Renderer {
     protected commandEncoder: GPUCommandEncoder;
     protected renderPassDescriptor: GPURenderPassDescriptor;
 
+    protected _shaderCode: string;
+
     constructor(manager: RendererManager, renderID?: number) {
         this.renderID = renderID ?? Date.now();
         this.manager = manager;
@@ -37,6 +39,9 @@ export abstract class Renderer {
         this.bindGroupEntries = [];
         this.bindGroupLayoutEntries = [];
     }
+
+    public get id(): number { return this.renderID; }
+    public get shaderCode(): string { return this._shaderCode; }
 
     public start(): void {
         this.initPipelineLayouts();
@@ -70,8 +75,7 @@ export abstract class Renderer {
 
     private initPipelines(): void {
         const device = this.context.getDevice();
-        const shaderCode = this.getShaderCode();
-        const shaderModule = device.createShaderModule({ code: shaderCode });
+        const shaderModule = device.createShaderModule({ code: this.shaderCode });
 
         this.pipeline = device.createRenderPipeline({
             layout: device.createPipelineLayout({
@@ -183,12 +187,6 @@ export abstract class Renderer {
         this.camera.resize(size);
         this.context.resizeWindow(this.renderID, size);
     }
-
-    public getID(): number { 
-        return this.renderID; 
-    }
-
-    protected abstract getShaderCode(): string;
 
     public reset(): void {
         this.camera = new Camera(this.context.getVolume());

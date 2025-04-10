@@ -1,25 +1,33 @@
 import * as daikon from 'daikon';
 
 export class Volume {
-    public name: string;
-    public size: number[];
-    public bytesPerVoxel: number;
-    public signed: boolean;
-    public boundingBox: number[];
-    public data: ArrayBuffer;
+    private _name: string;
+    private _size: number[];
+    private _bytesPerVoxel: number;
+    private _signed: boolean;
+    private _scale: number[];
+    private _data: ArrayBuffer;
 
     /**
      * Creates a new Volume instance
      * @param name Optional name of the volume
      */
     constructor(name?: string) {
-        this.name = name || '';
-        this.size = [1, 1, 1];
-        this.bytesPerVoxel = 2;
-        this.signed = false;
-        this.boundingBox = [0, 0, 0];
-        this.data = new ArrayBuffer(0);
+        this._name = name || '';
+        this._size = [1, 1, 1];
+        this._bytesPerVoxel = 2;
+        this._signed = false;
+        this._scale = [1, 1, 1];
+        this._data = new ArrayBuffer(0);
     }
+
+    public get name(): string { return this._name; }
+    public get size(): number[] { return this._size; }
+    public get bytesPerVoxel(): number { return this._bytesPerVoxel; }
+    public get signed(): boolean { return this._signed; }
+    public get scale(): number[] { return this._scale; }
+    public get data(): ArrayBuffer { return this._data; }
+    public get bounds(): number[] { return this._size.map((s, i) => s * this._scale[i]); }
 
     /**
      * Loads a Volume from a set of DICOM files
@@ -47,22 +55,19 @@ export class Volume {
         
         // Extract volume properties
         const firstImage = series.images[0];
-        this.size = [firstImage.getRows(), firstImage.getCols(), series.images.length];
-        this.bytesPerVoxel = firstImage.getBitsAllocated() / 8;
-        this.signed = firstImage.getPixelRepresentation() === 1;
+        this._size = [firstImage.getRows(), firstImage.getCols(), series.images.length];
+        this._bytesPerVoxel = firstImage.getBitsAllocated() / 8;
+        this._signed = firstImage.getPixelRepresentation() === 1;
+
+        if (this._bytesPerVoxel !== 2) throw new Error(`Unsupported bytes per voxel: ${this._bytesPerVoxel}`);
         
-        // Calculate bounding box using pixel spacing
+        // Calculate scale factors from voxel dimensions
         const pixelSpacing = firstImage.getPixelSpacing() || [1, 1];
-        this.boundingBox = [
-            this.size[0] * pixelSpacing[0],
-            this.size[1] * pixelSpacing[1],
-            this.size[2] * (firstImage.getSliceThickness() || 1)
-        ];
-        
-        if (this.bytesPerVoxel !== 2) throw new Error(`Unsupported bytes per voxel: ${this.bytesPerVoxel}`);
+        const sliceThickness = firstImage.getSliceThickness() || 1;
+        this._scale = [1 / pixelSpacing[0], 1 / pixelSpacing[1], 1 / sliceThickness];
         
         // Create volume data buffer
-        const totalVoxels = this.size[0] * this.size[1] * this.size[2];
+        const totalVoxels = this._size[0] * this._size[1] * this._size[2];
         const volumeData = new Uint16Array(totalVoxels);
         const shift = 2 ** 15;
         
@@ -70,7 +75,7 @@ export class Volume {
         for (let i = 0; i < series.images.length; i++) {
             const image = series.images[i];
             const pixelData = image.getInterpretedData();
-            const sliceSize = this.size[0] * this.size[1];
+            const sliceSize = this._size[0] * this._size[1];
             const sliceOffset = i * sliceSize;
             
             const rescaleSlope = image.getDataScaleSlope() || 1;
@@ -81,8 +86,7 @@ export class Volume {
                 volumeData[sliceOffset + j] = Math.round(rescaleSlope * pixelData[j] + shift);
             }
         }
-        console.log(this.signed);
-        
-        this.data = volumeData.buffer;
+
+        this._data = volumeData.buffer;
     }
 }

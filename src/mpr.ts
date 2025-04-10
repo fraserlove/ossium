@@ -7,10 +7,7 @@ export class RendererMPR extends Renderer {
     constructor(manager: RendererManager, renderID?: number) {
         super(manager, renderID);
         this.gui = new MPRGUI(this.renderID, manager);
-    }
-
-    protected getShaderCode(): string {
-        return mpr;
+        this._shaderCode = mpr;
     }
 
     protected getUniformData(): Float32Array {
@@ -18,7 +15,7 @@ export class RendererMPR extends Renderer {
         const uniformData = new Float32Array(20);
         
         // Set view matrix (16 floats)
-        uniformData.set(this.camera.getViewMatrix(), 0);
+        uniformData.set(this.camera.view, 0);
         
         // Add window attributes
         const settings = (this.gui as MPRGUI).getSettings();
