@@ -2,6 +2,10 @@
 
 A volume rendering application to display 3D volumes created from DICOM files in the browser, using WebGPU. Two rendering techniques are implemented: Multi-Planar Reformatting (MPR) using maximum intensity projection and Shaded Volume Rendering (SVR) using Blinn-Phong lighting. Ossium requires a [WebGPU-enabled](https://github.com/gpuweb/gpuweb/wiki/Implementation-Status) browser to run.
 
+Below is an example of Ossium running on a volume of a human brain, avaliable under the `assets/` folder.
+
+![MPR](assets/brain.png)
+
 ## Installation and Usage
 
 Clone the repository and install the dependencies:
@@ -34,9 +38,3 @@ This will generate a transfer function file with the default settings. The trans
 | Zoom | `Vertical Scroll` |
 | Cine | `Horizontal Scroll` |
 | Change Light Direction | `Control` + `Left Click` + Drag (SVR only) |
-
-## Examples
-
-![MPR](assets/mpr.png)
-
-![SVR](assets/svr.png)
