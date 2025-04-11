@@ -1,10 +1,10 @@
 export class TransferFunction {
-    // Magic number to identify the transfer function file format
-    public static readonly MAGIC_NUMBER = 'TF01';
-
     private _name: string;
     private _size: number;
     private _data: ArrayBuffer;
+    
+    // Identifies the transfer function file format
+    public readonly MAGIC_NUMBER = 'TF01';
     
     constructor(name?: string) {
         this._name = name || '';
@@ -13,7 +13,7 @@ export class TransferFunction {
     }
 
     public get name(): string { return this._name; }
-    public get size(): number { return this._size; }
+    public get size(): number[] { return [this._size]; }
     public get data(): ArrayBuffer { return this._data; }
 
     public async load(file: File): Promise<void> {
@@ -22,7 +22,7 @@ export class TransferFunction {
         
         // Check magic number 'TF01'
         const magic = new TextDecoder().decode(buffer.slice(0, 4));
-        if (magic !== TransferFunction.MAGIC_NUMBER) {
+        if (magic !== this.MAGIC_NUMBER) {
             throw new Error('Invalid transfer function');
         }
 

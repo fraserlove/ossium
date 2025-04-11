@@ -30,7 +30,7 @@ export abstract class Renderer {
     constructor(engine: Engine, renderID?: number) {
         this.renderID = renderID ?? Date.now();
         this.engine = engine;
-        const volume = this.engine.getVolume();
+        const volume = this.engine.volume;
         this.camera = new Camera(volume.bounds, volume.scale);
         this.controller = new Controller(this.engine.newWindow(this.renderID), this.camera);
 
@@ -40,6 +40,7 @@ export abstract class Renderer {
 
     public get id(): number { return this.renderID; }
     public get shaderCode(): string { return this._shaderCode; }
+    protected abstract get uniformData(): Float32Array;
 
     public start(): void {
         this.initPipelineLayouts();
@@ -66,17 +67,16 @@ export abstract class Renderer {
             sampler: { type: 'filtering' } 
         });
 
-        this.bindGroupLayout = this.engine.getDevice().createBindGroupLayout({
+        this.bindGroupLayout = this.engine.device.createBindGroupLayout({
             entries: this.bindGroupLayoutEntries
         });
     }
 
     private initPipelines(): void {
-        const device = this.engine.getDevice();
-        const shaderModule = device.createShaderModule({ code: this.shaderCode });
+        const shaderModule = this.engine.device.createShaderModule({ code: this.shaderCode });
 
-        this.pipeline = device.createRenderPipeline({
-            layout: device.createPipelineLayout({
+        this.pipeline = this.engine.device.createRenderPipeline({
+            layout: this.engine.device.createPipelineLayout({
                 bindGroupLayouts: [this.bindGroupLayout]
             }),
             vertex: {
@@ -86,38 +86,32 @@ export abstract class Renderer {
             fragment: {
                 module: shaderModule,
                 entryPoint: 'frag_main',
-                targets: [{ format: this.engine.displayFormat() }]
+                targets: [{ format: this.engine.displayFormat }]
             }
         });
     }
 
     private initBuffers(): void {
-        const device = this.engine.getDevice();
-        
-        this.uniformBuffer = device.createBuffer({
-            size: this.getUniformData().byteLength,
+        // Create uniform buffer
+        this.uniformBuffer = this.engine.device.createBuffer({
+            size: this.uniformData.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
     }
 
     protected initResources(): void {
-        const device = this.engine.getDevice();
-        const volume = this.engine.getVolume();
-        
-        this.sampler = device.createSampler({
+        this.sampler = this.engine.device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear'
         });
 
-        // Using 16-bit texture format - red(low bits), green(high bits)
-        const textureFormat = 'rg8unorm';
-        
+        const volume = this.engine.volume;
         const bytesPerRow = volume.size[0] * volume.bytesPerVoxel;
 
         // Create 3D texture for volume data
-        this.volumeTexture = device.createTexture({
+        this.volumeTexture = this.engine.device.createTexture({
             size: volume.size,
-            format: textureFormat,
+            format: 'rg8unorm', // 16-bit - red(low bits), green(high bits)
             usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
             dimension: '3d'
         });
@@ -129,7 +123,7 @@ export abstract class Renderer {
             rowsPerImage: volume.size[1]
         };
 
-        this.engine.getQueue().writeTexture(
+        this.engine.queue.writeTexture(
             { texture: this.volumeTexture },
             volume.data,
             imageDataLayout,
@@ -153,32 +147,25 @@ export abstract class Renderer {
         this.bindGroupEntries.push({ binding: 1, resource: this.volumeTexture.createView() });
         this.bindGroupEntries.push({ binding: 2, resource: this.sampler });
 
-        this.bindGroup = this.engine.getDevice().createBindGroup({
+        this.bindGroup = this.engine.device.createBindGroup({
             layout: this.bindGroupLayout,
             entries: this.bindGroupEntries
         });
     }
 
-    private executePipeline(): void {
-        this.renderPassDescriptor.colorAttachments[0].view = 
-            this.engine.getGPUContext(this.renderID).getCurrentTexture().createView();
+    public render(): void {
+        this.commandEncoder = this.engine.device.createCommandEncoder();
+        this.renderPassDescriptor.colorAttachments[0].view = this.engine.context(this.renderID).getCurrentTexture().createView();
         
+        // Execute render pass
         const passEncoder = this.commandEncoder.beginRenderPass(this.renderPassDescriptor);
-        
-        this.engine.getQueue().writeBuffer(this.uniformBuffer, 0, this.getUniformData());
-        
+        this.engine.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData);
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.bindGroup);
         passEncoder.draw(3);
         passEncoder.end();
-    }
-
-    protected abstract getUniformData(): Float32Array;
-
-    public render(): void {
-        this.commandEncoder = this.engine.getDevice().createCommandEncoder();
-        this.executePipeline();
-        this.engine.getQueue().submit([this.commandEncoder.finish()]);
+        
+        this.engine.queue.submit([this.commandEncoder.finish()]);
     }
 
     public resize(size: [number, number]): void {
@@ -187,9 +174,8 @@ export abstract class Renderer {
     }
 
     public reset(): void {
-        const volume = this.engine.getVolume();
-        this.camera = new Camera(volume.bounds, volume.scale);
-        this.controller = new Controller(this.engine.getWindow(this.renderID), this.camera);
+        this.camera = new Camera(this.engine.volume.bounds, this.engine.volume.scale);
+        this.controller = new Controller(this.engine.window(this.renderID), this.camera);
         
         this.bindGroupEntries = [];
         this.bindGroupLayoutEntries = [];

@@ -7,10 +7,10 @@ export class Controller {
     private activeKey: string | null = null;
 
     // Sensitivity parameters
-    private readonly zoomFactor: number = 0.1;
-    private readonly rotationFactor: number = 0.0025;
-    private readonly lightFactor: number = 0.0025;
-    private readonly panFactor: number = 1;
+    private readonly ZOOM_FACTOR: number = 0.0025;
+    private readonly ROTATION_FACTOR: number = 0.0025;
+    private readonly LIGHT_FACTOR: number = 0.0025;
+    private readonly PAN_FACTOR: number = 1;
 
     /**
      * Creates a new controller for camera interaction
@@ -35,7 +35,7 @@ export class Controller {
 
     private mouseWheel(e: WheelEvent): void {
         e.preventDefault(); // Prevent page scrolling
-        this.camera.zoom = e.deltaY * this.zoomFactor;
+        this.camera.zoom = e.deltaY * this.ZOOM_FACTOR;
     }
 
     private mouseDown(e: MouseEvent): void {
@@ -56,15 +56,15 @@ export class Controller {
             case 0: // Left button
                 switch (this.activeKey) {
                     case 'Control':
-                        this.camera.lighting = [dx * this.lightFactor, dy * this.lightFactor];
+                        this.camera.lighting = [dx * this.LIGHT_FACTOR, dy * this.LIGHT_FACTOR];
                         break;
                     default:
-                        this.camera.rotation = [dx * this.rotationFactor, dy * this.rotationFactor];
+                        this.camera.rotation = [dx * this.ROTATION_FACTOR, dy * this.ROTATION_FACTOR];
                         break;
                 }
                 break;
             case 2: // Right button
-                this.camera.pan = [dx * this.panFactor, dy * this.panFactor];
+                this.camera.pan = [dx * this.PAN_FACTOR, dy * this.PAN_FACTOR];
                 break;
         }
     }

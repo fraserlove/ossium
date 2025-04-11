@@ -10,17 +10,12 @@ export class RendererMPR extends Renderer {
         this._shaderCode = mpr;
     }
 
-    protected getUniformData(): Float32Array {
-        // Create uniform buffer with 16-byte alignment (80 bytes) - https://www.w3.org/TR/WGSL/#alignment-and-size
+    protected get uniformData(): Float32Array {
+        // Aligned to 16 bytes (20 floats = 80 bytes)
+        // https://www.w3.org/TR/WGSL/#alignment-and-size
         const uniformData = new Float32Array(20);
-        
-        // Set view matrix (16 floats)
         uniformData.set(this.camera.view, 0);
-        
-        // Add window attributes
-        const settings = (this.gui as MPRGUI).getSettings();
-        uniformData.set(settings, 16);
-        
+        uniformData.set(this.gui.settings, 16);
         return uniformData;
     }
 }

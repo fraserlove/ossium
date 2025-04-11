@@ -1,5 +1,5 @@
 import { mat4, vec3 } from 'gl-matrix';
-import { Volume } from './volume';
+import { Volume } from '../types/volume';
 
 export class Camera {
     private _forward: vec3 = vec3.fromValues(0, 0, 1);
