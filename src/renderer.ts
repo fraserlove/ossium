@@ -184,8 +184,8 @@ export abstract class Renderer {
         this.context.getQueue().submit([this.commandEncoder.finish()]);
     }
 
-    public resize(size: number[]): void {
-        this.camera.resize(size);
+    public resize(size: [number, number]): void {
+        this.camera.recentre(size);
         this.context.resizeWindow(this.renderID, size);
     }
 

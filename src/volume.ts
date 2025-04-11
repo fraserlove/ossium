@@ -27,7 +27,7 @@ export class Volume {
     public get signed(): boolean { return this._signed; }
     public get scale(): number[] { return this._scale; }
     public get data(): ArrayBuffer { return this._data; }
-    public get bounds(): number[] { return this._size.map((s, i) => s * this._scale[i]); }
+    public get bounds(): number[] { return this._size.map((s, i) => s / this._scale[i]); }
 
     /**
      * Loads a Volume from a set of DICOM files
@@ -64,7 +64,7 @@ export class Volume {
         // Calculate scale factors from voxel dimensions
         const pixelSpacing = firstImage.getPixelSpacing() || [1, 1];
         const sliceThickness = firstImage.getSliceThickness() || 1;
-        this._scale = [1 / pixelSpacing[0], 1 / pixelSpacing[1], 1 / sliceThickness];
+        this._scale = [pixelSpacing[0], pixelSpacing[1], sliceThickness];
         
         // Create volume data buffer
         const totalVoxels = this._size[0] * this._size[1] * this._size[2];

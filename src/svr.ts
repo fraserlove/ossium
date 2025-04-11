@@ -73,7 +73,7 @@ export class RendererSVR extends Renderer {
         uniformData.set(this.camera.view, 0);
         
         // Set light position (vec3 + padding)
-        uniformData.set(this.camera.lightDirection, 16);
+        uniformData.set(this.camera.lightDir, 16);
         
         // Set lighting attributes
         const settings = (this.gui as SVRGUI).getSettings();

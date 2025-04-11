@@ -1,16 +1,15 @@
 import { Camera } from './camera';
 
 export class Controller {
-    private display: HTMLCanvasElement;
     private camera: Camera;
+    private display: HTMLCanvasElement;
     private activeButton: number | null = null;
-    private updateLightSource: boolean = false;
-    private initPos: [number, number] = [0, 0];
+    private activeKey: string | null = null;
 
     // Sensitivity parameters
-    private readonly zoomFactor: number = 1000;
-    private readonly rotationFactor: number = 400;
-    private readonly lightFactor: number = 400;
+    private readonly zoomFactor: number = 0.001;
+    private readonly rotationFactor: number = 0.0025;
+    private readonly lightFactor: number = 0.0025;
     private readonly panFactor: number = 1;
 
     /**
@@ -36,46 +35,41 @@ export class Controller {
 
     private mouseWheel(e: WheelEvent): void {
         e.preventDefault(); // Prevent page scrolling
-        
-        // Simplify to only handle zoom
-        this.camera.zoom = e.deltaY / this.zoomFactor;
+        this.camera.zoom = e.deltaY * this.zoomFactor;
     }
 
     private mouseDown(e: MouseEvent): void {
+        this.display.requestPointerLock() // Hide cursor
         this.activeButton = e.button;
-        this.initPos = [e.pageX, e.pageY];
-        // Hide cursor when clicking
-        this.display.style.cursor = 'none';
     }
 
     private mouseUp(e: MouseEvent): void {
-        if (e.button === this.activeButton) {
-            this.activeButton = null;
-            // Restore cursor when releasing mouse button
-            this.display.style.cursor = 'default';
-        }
+        document.exitPointerLock(); // Restore cursor
+        this.activeButton = null;
     }
 
     private mouseMove(e: MouseEvent): void {
-        const dx = e.pageX - this.initPos[0];
-        const dy = e.pageY - this.initPos[1];
+        const dx = e.movementX;
+        const dy = e.movementY;
         
-        if (this.activeButton === 0) { // Left button
-            // Update lighting if shift key is held
-            if (this.updateLightSource) {
-                this.camera.lighting = [dx / this.lightFactor, dy / this.lightFactor];
-            } else {
-                // Rotate view otherwise
-                this.camera.rotation = [dx / this.rotationFactor, dy / this.rotationFactor];
-            }
-        } else if (this.activeButton === 2) { // Right button
-            // Pan view
-            this.camera.pan = [dx * this.panFactor, dy * this.panFactor];
+        switch (this.activeButton) {
+            case 0: // Left button
+                switch (this.activeKey) {
+                    case 'Control':
+                        this.camera.lighting = [dx * this.lightFactor, dy * this.lightFactor];
+                        break;
+                    default:
+                        this.camera.rotation = [dx * this.rotationFactor, dy * this.rotationFactor];
+                        break;
+                }
+                break;
+            case 2: // Right button
+                this.camera.pan = [dx * this.panFactor, dy * this.panFactor];
+                break;
         }
-        
-        this.initPos = [e.pageX, e.pageY];
     }
 
-    private keyDown(e: KeyboardEvent): void { if (e.key === 'Shift') this.updateLightSource = true; }
-    private keyUp(e: KeyboardEvent): void { if (e.key === 'Shift') this.updateLightSource = false; }
+    private keyDown(e: KeyboardEvent): void { this.activeKey = e.key; }
+    
+    private keyUp(e: KeyboardEvent): void { this.activeKey = null; }
 }
