@@ -8,10 +8,6 @@ export class Volume {
     private _scale: number[];
     private _data: ArrayBuffer;
 
-    /**
-     * Creates a new Volume instance
-     * @param name Optional name of the volume
-     */
     constructor(name?: string) {
         this._name = name || '';
         this._size = [1, 1, 1];

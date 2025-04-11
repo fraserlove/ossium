@@ -7,7 +7,7 @@ export class Controller {
     private activeKey: string | null = null;
 
     // Sensitivity parameters
-    private readonly zoomFactor: number = 0.001;
+    private readonly zoomFactor: number = 0.1;
     private readonly rotationFactor: number = 0.0025;
     private readonly lightFactor: number = 0.0025;
     private readonly panFactor: number = 1;
@@ -70,6 +70,5 @@ export class Controller {
     }
 
     private keyDown(e: KeyboardEvent): void { this.activeKey = e.key; }
-    
     private keyUp(e: KeyboardEvent): void { this.activeKey = null; }
 }

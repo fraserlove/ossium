@@ -1,15 +1,15 @@
 import { Renderer } from './renderer';
 import { SVRGUI } from './gui';
 import svr from '../shaders/svr.wgsl';
-import { RendererManager } from './manager';
+import { Engine } from './engine';
 
 export class RendererSVR extends Renderer {
 
     private transferFunctionTexture: GPUTexture;
 
-    constructor(manager: RendererManager, renderID?: number) {
-        super(manager, renderID);
-        this.gui = new SVRGUI(this.renderID, manager);
+    constructor(engine: Engine, renderID?: number) {
+        super(engine, renderID);
+        this.gui = new SVRGUI(this.renderID, engine);
         this._shaderCode = svr;
     }
 
@@ -26,9 +26,9 @@ export class RendererSVR extends Renderer {
         super.initResources();
 
         // Calculate dimensions for transfer function texture
-        const tf = this.context.getTransferFunction();
+        const tf = this.engine.getTransferFunction();
         
-        this.transferFunctionTexture = this.context.getDevice().createTexture({
+        this.transferFunctionTexture = this.engine.getDevice().createTexture({
             size: [tf.size],
             format: 'rgba32float',
             usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
@@ -44,7 +44,7 @@ export class RendererSVR extends Renderer {
             rowsPerImage: 1
         };
 
-        this.context.getQueue().writeTexture(
+        this.engine.getQueue().writeTexture(
             { texture: this.transferFunctionTexture },
             tf.data,
             imageDataLayout,
@@ -59,7 +59,7 @@ export class RendererSVR extends Renderer {
         this.bindGroupEntries.push({ binding: 2, resource: this.sampler });
         this.bindGroupEntries.push({ binding: 3, resource: this.transferFunctionTexture.createView() });
 
-        this.bindGroup = this.context.getDevice().createBindGroup({
+        this.bindGroup = this.engine.getDevice().createBindGroup({
             layout: this.bindGroupLayout,
             entries: this.bindGroupEntries
         });
@@ -80,7 +80,7 @@ export class RendererSVR extends Renderer {
         uniformData.set(settings, 20);
         
         // Set transfer function size
-        uniformData[26] = this.context.getTransferFunction().size;
+        uniformData[26] = this.engine.getTransferFunction().size;
         
         return uniformData;
     }

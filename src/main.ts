@@ -1,15 +1,11 @@
-import { Context } from './context';
-import { RendererManager } from './manager';
+import { Engine } from './engine';
 
 async function main(): Promise<void> {
-
-    const context = new Context();
-    const manager = new RendererManager(context);
-
-    await context.initWebGPU();
+    const engine = new Engine();
+    await engine.initWebGPU();
     
     const run = () => {
-        manager.render();
+        engine.render();
         requestAnimationFrame(run);
     }
     requestAnimationFrame(run);

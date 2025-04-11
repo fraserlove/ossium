@@ -1,12 +1,12 @@
 import { Renderer } from './renderer';
 import { MPRGUI } from './gui';
 import mpr from '../shaders/mpr.wgsl';
-import { RendererManager } from './manager';
+import { Engine } from './engine';
 
 export class RendererMPR extends Renderer {
-    constructor(manager: RendererManager, renderID?: number) {
-        super(manager, renderID);
-        this.gui = new MPRGUI(this.renderID, manager);
+    constructor(engine: Engine, renderID?: number) {
+        super(engine, renderID);
+        this.gui = new MPRGUI(this.renderID, engine);
         this._shaderCode = mpr;
     }
 

@@ -1,7 +1,11 @@
 import { Volume } from './volume';
 import { TransferFunction } from './transfer_function';
+import { Renderer } from './renderer';
+import { RendererMPR } from './mpr';
+import { RendererSVR } from './svr';
+import { GlobalGUI } from './gui';
 
-export class Context {
+export class Engine {
     private volume: Volume;
     private transferFunction: TransferFunction;
     private volumeIDs: string[] = [];
@@ -13,10 +17,19 @@ export class Context {
     private containers = new Map<number, HTMLDivElement>();
     private windows = new Map<number, HTMLCanvasElement>();
     private contexts = new Map<number, GPUCanvasContext>();
+    
+    private renderers = new Map<number, Renderer>();
+    private settings: GlobalGUI;
 
     constructor() {
         this.volume = new Volume();
         this.transferFunction = new TransferFunction();
+        this.settings = new GlobalGUI(this);
+
+        // Add window resize handler
+        window.onresize = () => {
+            if (this.device != undefined) { this.resize(); }
+        }
     }
 
     public getVolume(): Volume { return this.volume; }
@@ -44,7 +57,7 @@ export class Context {
                 this.volumeIDs.push(volume.name);
             }
             
-            console.log(`CONTEXT: Loaded Volume ${this.volume.name}`);
+            console.log(`Loaded Volume ${this.volume.name}`);
         } catch (error) {
             console.error('Failed to load volume:', error);
         }
@@ -64,7 +77,7 @@ export class Context {
                 this.transferFunctionIDs.push(tf.name);
             }
             
-            console.log(`CONTEXT: Loaded Transfer Function ${this.transferFunction.name}`);
+            console.log(`Loaded Transfer Function ${this.transferFunction.name}`);
         } catch (error) {
             console.error('Failed to load transfer function:', error);
         }
@@ -151,13 +164,66 @@ export class Context {
             });
             
             this.queue = this.device.queue;
-            console.log('CONTEXT: Initialised WebGPU.');
+            console.log('Initialised WebGPU.');
             return true;
         }
         catch(error) {
             console.error(error);
-            console.log('CONTEXT: WebGPU Not Supported.');
+            console.log('WebGPU Not Supported.');
             return false;
+        }
+    }
+
+    // Add renderer management methods
+    public render(): void {
+        for (const renderer of this.renderers.values()) {
+            renderer.render();
+        }
+    }
+
+    public addMPR(renderID?: number): void {
+        this.addRenderer(new RendererMPR(this, renderID));
+    }
+
+    public addSVR(renderID?: number): void {
+        this.addRenderer(new RendererSVR(this, renderID));
+    }
+
+    private async addRenderer(renderer: Renderer, renderID?: number): Promise<void> {
+        if (renderID != undefined) {
+            this.renderers.set(renderID, renderer);
+        } else {
+            this.renderers.set(renderer.id, renderer);
+        }
+        this.resize();
+        await renderer.start();
+    }
+
+    public destroyRenderer(rendererID: number): void {
+        this.removeWindow(rendererID);
+        this.renderers.delete(rendererID);
+        this.resize();
+    }
+
+    public resize(): void {
+        for (const renderer of this.renderers.values()) {
+            renderer.resize([window.innerWidth / this.renderers.size, window.innerHeight]);
+        }
+    }
+
+    public reloadRenderer(rendererID: number): void {
+        console.log('Resetting renderer ' + rendererID + '...');
+        const renderer = this.renderers.get(rendererID);
+        if (renderer) {
+            renderer.reset();
+        }
+        console.log('Reset Renderer.');
+    }
+
+    public reloadAllRenderers(): void {
+        console.log('Resetting all renderers...');
+        for (const renderer of this.renderers.values()) {
+            renderer.reset();
         }
     }
 }

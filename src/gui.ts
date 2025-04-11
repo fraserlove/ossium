@@ -1,18 +1,22 @@
 import { GUI } from 'lil-gui';
-import { RendererManager } from './manager';
+import { Engine } from './engine';
 
 export class GlobalGUI {
     protected gui: GUI;
 
-    constructor(manager: RendererManager) {
+    constructor(engine: Engine) {
         this.gui = new GUI({ title: 'Settings', width: 250, autoPlace: false });
         this.gui.domElement.id = 'gui-global';
         document.body.appendChild(this.gui.domElement);
 
-        this.globalGUI(manager);
+        this.globalGUI(engine);
     }
 
-    private globalGUI(manager: RendererManager): void {
+    /**
+     * Creates the global GUI for the application
+     * @param engine The engine instance
+     */
+    private globalGUI(engine: Engine): void {
         const volumeInput = this.createFileInput('.dcm', true, true);
         
         this.gui.add({ loadDICOM: () => volumeInput.click() }, 'loadDICOM').name('Load Volume');
@@ -24,9 +28,10 @@ export class GlobalGUI {
             const path = files[0].webkitRelativePath;
             const folderName = path.split('/')[0];
             
-            await manager.getContext().loadVolume(Array.from(files), folderName);
-            manager.reloadAllRenderers();
+            await engine.loadVolume(Array.from(files), folderName);
+            engine.reloadAllRenderers();
         };
+
         const tfInput = this.createFileInput('.tf', false, false);
         
         this.gui.add({ loadTF: () => tfInput.click() }, 'loadTF').name('Load Transfer Function');
@@ -35,12 +40,12 @@ export class GlobalGUI {
             const files = (e.target as HTMLInputElement).files;
             if (!files?.length) return;
             
-            await manager.getContext().loadTransferFunction(files[0]);
-            manager.reloadAllRenderers();
+            await engine.loadTransferFunction(files[0]);
+            engine.reloadAllRenderers();
         };
 
-        this.gui.add(manager, 'addMPR').name('Add MPR');
-        this.gui.add(manager, 'addSVR').name('Add SVR');
+        this.gui.add({ addMPR: () => engine.addMPR() }, 'addMPR').name('Add MPR');
+        this.gui.add({ addSVR: () => engine.addSVR() }, 'addSVR').name('Add SVR');
     }
 
     /**
@@ -67,15 +72,15 @@ export class GlobalGUI {
 export class RendererGUI {
     protected gui: GUI;
     protected renderID: number;
-    protected manager: RendererManager;
+    protected engine: Engine;
 
-    constructor(renderID: number, manager: RendererManager) {
+    constructor(renderID: number, engine: Engine) {
         this.renderID = renderID;
-        this.manager = manager;
+        this.engine = engine;
         this.gui = new GUI({ title: 'Renderer', width: 250, autoPlace: false });
         this.gui.domElement.id = 'gui';
 
-        manager.getContext().getContainer(this.renderID).appendChild(this.gui.domElement);
+        engine.getContainer(this.renderID).appendChild(this.gui.domElement);
     }
 
     public getSettings(): Float32Array { 
@@ -87,13 +92,13 @@ export class MPRGUI extends RendererGUI {
     private windowWidth: number = 0.018;
     private windowLevel: number = 0.498;
 
-    constructor(renderID: number, manager: RendererManager) {
-        super(renderID, manager);
+    constructor(renderID: number, engine: Engine) {
+        super(renderID, engine);
         this.gui.title('MPR');
         
         this.gui.add(this, 'windowWidth', 0, 0.05, 0.0001).name('Window Width');
         this.gui.add(this, 'windowLevel', 0.48, 0.52, 0.0001).name('Window Level');
-        this.gui.add({destroyRenderer: () => manager.destroyRenderer(this.renderID)}, 'destroyRenderer').name('Delete');
+        this.gui.add({ destroyRenderer: () => engine.destroyRenderer(this.renderID) }, 'destroyRenderer').name('Delete');
     }
 
     public getSettings(): Float32Array { 
@@ -107,15 +112,15 @@ export class SVRGUI extends RendererGUI {
     private ambient: number = 0.3;
     private lightColour: number[] = [1, 1, 1];
 
-    constructor(renderID: number, manager: RendererManager) {
-        super(renderID, manager);
+    constructor(renderID: number, engine: Engine) {
+        super(renderID, engine);
         this.gui.title('SVR');
 
         this.gui.add(this, 'diffuse', 0, 1).name('Diffuse');
         this.gui.add(this, 'specular', 0, 1).name('Specular');
         this.gui.add(this, 'ambient', 0, 1).name('Ambient');
         this.gui.addColor(this, 'lightColour').name('Light Colour');
-        this.gui.add({ destroyRenderer: () => manager.destroyRenderer(this.renderID) }, 'destroyRenderer').name('Delete');
+        this.gui.add({ destroyRenderer: () => engine.destroyRenderer(this.renderID) }, 'destroyRenderer').name('Delete');
     }
 
     public getSettings(): Float32Array {
